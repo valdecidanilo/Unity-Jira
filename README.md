@@ -4,15 +4,20 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 
 ## Recursos incluídos
 
-- Menu superior `Jira`.
-- Janela `Jira > Open Jira Workspace` construída com UI Toolkit.
+- Menu superior `Jira` com logo oficial na janela e no ícone da aba.
+- Janela `Jira > Open Jira Workspace` construída com UI Toolkit, dividida em duas abas: **Conexão** e **Criar Issue**.
 - Campos para URL do Jira, e-mail Atlassian e API Token.
 - Teste real de conexão usando `GET /rest/api/3/myself`.
+- Aba **Criar Issue** com criação de história, tarefa, bug e subtask:
+  - Seleção de projeto e tipo de issue carregados dinamicamente dos metadados (`createmeta`).
+  - Título, descrição (convertida para Atlassian Document Format) e issue pai para subtasks.
+  - Listagem de **épicos** ativos para vínculo (projetos team-managed).
+  - Listagem de **sprints ativas**; a issue é movida para a sprint escolhida após ser criada.
+  - Botão para abrir a issue recém-criada direto no Jira.
 - Mensagens amigáveis para erros HTTP comuns.
 - URL e e-mail salvos apenas nas preferências locais do Editor.
 - API Token mantido somente na sessão atual do Unity por padrão.
 - Separação entre autenticação, cliente REST, modelos, preferências e UI.
-- Estrutura preparada para histórias, tarefas, bugs, subtasks e templates.
 
 ## Instalação
 

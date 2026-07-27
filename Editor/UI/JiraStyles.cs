@@ -140,5 +140,79 @@ namespace OxenteGames.JiraCommunication.UI
             label.style.fontSize = 11;
             label.style.whiteSpace = WhiteSpace.Normal;
         }
+
+        public static void ApplyTabBar(VisualElement bar)
+        {
+            bar.style.flexDirection = FlexDirection.Row;
+            bar.style.paddingLeft = 22;
+            bar.style.paddingRight = 22;
+            bar.style.backgroundColor = Surface;
+            bar.style.borderBottomWidth = 1;
+            bar.style.borderBottomColor = Border;
+        }
+
+        public static void ApplyTab(Button tab, bool active)
+        {
+            tab.style.height = 38;
+            tab.style.paddingLeft = 16;
+            tab.style.paddingRight = 16;
+            tab.style.marginRight = 4;
+            tab.style.marginLeft = 0;
+            tab.style.marginTop = 0;
+            tab.style.marginBottom = 0;
+            tab.style.backgroundColor = Color.clear;
+            tab.style.color = active ? TextPrimary : TextSecondary;
+            tab.style.unityFontStyleAndWeight = active ? FontStyle.Bold : FontStyle.Normal;
+            tab.style.borderLeftWidth = 0;
+            tab.style.borderRightWidth = 0;
+            tab.style.borderTopWidth = 0;
+            tab.style.borderBottomWidth = 2;
+            tab.style.borderBottomColor = active ? Accent : Color.clear;
+            tab.style.borderTopLeftRadius = 0;
+            tab.style.borderTopRightRadius = 0;
+            tab.style.borderBottomLeftRadius = 0;
+            tab.style.borderBottomRightRadius = 0;
+        }
+
+        public static void ApplyDropdown(DropdownField dropdown)
+        {
+            dropdown.style.marginBottom = 10;
+            dropdown.style.color = TextPrimary;
+        }
+
+        public static void ApplyMultiline(TextField field)
+        {
+            field.multiline = true;
+            field.style.marginBottom = 10;
+            field.style.minHeight = 84;
+            field.style.color = TextPrimary;
+            field.style.whiteSpace = WhiteSpace.Normal;
+        }
+
+        public static void ApplyLinkButton(Button button)
+        {
+            button.style.height = 30;
+            button.style.marginTop = 10;
+            button.style.backgroundColor = new Color(Accent.r, Accent.g, Accent.b, 0.18f);
+            button.style.color = Accent;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.borderTopLeftRadius = 5;
+            button.style.borderTopRightRadius = 5;
+            button.style.borderBottomLeftRadius = 5;
+            button.style.borderBottomRightRadius = 5;
+            button.style.borderLeftWidth = 0;
+            button.style.borderRightWidth = 0;
+            button.style.borderTopWidth = 0;
+            button.style.borderBottomWidth = 0;
+        }
+
+        public static void ApplyFieldHint(Label label)
+        {
+            label.style.color = TextSecondary;
+            label.style.fontSize = 10;
+            label.style.marginTop = -4;
+            label.style.marginBottom = 10;
+            label.style.whiteSpace = WhiteSpace.Normal;
+        }
     }
 }

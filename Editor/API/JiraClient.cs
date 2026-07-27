@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using OxenteGames.JiraCommunication.Models;
 using UnityEditor;
@@ -18,16 +20,172 @@ namespace OxenteGames.JiraCommunication.API
             _authProvider = authProvider ?? throw new ArgumentNullException(nameof(authProvider));
         }
 
-        public Task<JiraConnectionResult> TestConnectionAsync()
+        public string BaseUrl => _baseUrl;
+
+        // --- Connection -----------------------------------------------------
+
+        public async Task<JiraConnectionResult> TestConnectionAsync()
         {
-            return SendGetAsync<JiraUser>("/rest/api/3/myself");
+            JiraResponse response = await SendAsync(UnityWebRequest.kHttpVerbGET, "/rest/api/3/myself", null);
+            if (!response.Success)
+                return JiraConnectionResult.Fail(response.StatusCode, response.Error);
+
+            try
+            {
+                var user = JsonUtility.FromJson<JiraUser>(response.Body);
+                return JiraConnectionResult.Ok(user);
+            }
+            catch (Exception exception)
+            {
+                return JiraConnectionResult.Fail(
+                    response.StatusCode,
+                    $"Não foi possível processar a resposta do Jira: {exception.Message}");
+            }
         }
 
-        private Task<JiraConnectionResult> SendGetAsync<T>(string relativePath) where T : class
+        // --- Metadata -------------------------------------------------------
+
+        public async Task<List<JiraProject>> GetProjectsAsync()
         {
-            var completion = new TaskCompletionSource<JiraConnectionResult>();
-            var request = UnityWebRequest.Get(_baseUrl + relativePath);
-            request.timeout = 20;
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                "/rest/api/3/project/search?maxResults=100&orderBy=name",
+                null);
+
+            ThrowIfFailed(response, "Não foi possível carregar os projetos.");
+            var page = JsonUtility.FromJson<JiraProjectPage>(response.Body);
+            return ToList(page?.values);
+        }
+
+        public async Task<List<JiraIssueType>> GetIssueTypesAsync(string projectKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/issue/createmeta/{UnityWebRequest.EscapeURL(projectKey)}/issuetypes?maxResults=100",
+                null);
+
+            ThrowIfFailed(response, "Não foi possível carregar os tipos de issue do projeto.");
+            var page = JsonUtility.FromJson<JiraIssueTypePage>(response.Body);
+            return ToList(page?.values);
+        }
+
+        public async Task<List<JiraBoard>> GetBoardsAsync(string projectKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/agile/1.0/board?projectKeyOrId={UnityWebRequest.EscapeURL(projectKey)}&maxResults=50",
+                null);
+
+            // The Agile API may be unavailable (e.g. Jira Core). Treat as "no boards".
+            if (!response.Success)
+                return new List<JiraBoard>();
+
+            var page = JsonUtility.FromJson<JiraBoardPage>(response.Body);
+            return ToList(page?.values);
+        }
+
+        public async Task<List<JiraSprint>> GetActiveSprintsAsync(int boardId)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/agile/1.0/board/{boardId}/sprint?state=active&maxResults=50",
+                null);
+
+            // Kanban boards return 400 for sprint queries. Treat as "no sprints".
+            if (!response.Success)
+                return new List<JiraSprint>();
+
+            var page = JsonUtility.FromJson<JiraSprintPage>(response.Body);
+            return ToList(page?.values);
+        }
+
+        public async Task<List<JiraEpic>> GetEpicsAsync(int boardId)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/agile/1.0/board/{boardId}/epic?done=false&maxResults=50",
+                null);
+
+            if (!response.Success)
+                return new List<JiraEpic>();
+
+            var page = JsonUtility.FromJson<JiraEpicPage>(response.Body);
+            return ToList(page?.values);
+        }
+
+        // --- Mutations ------------------------------------------------------
+
+        public async Task<JiraCreateIssueResult> CreateIssueAsync(JiraIssueDraft draft)
+        {
+            if (draft == null)
+                return JiraCreateIssueResult.Fail("Rascunho de issue inválido.");
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPOST,
+                "/rest/api/3/issue",
+                draft.ToJson());
+
+            if (!response.Success)
+                return JiraCreateIssueResult.Fail(BuildIssueError(response));
+
+            try
+            {
+                var created = JsonUtility.FromJson<JiraCreatedIssue>(response.Body);
+                if (created == null || string.IsNullOrEmpty(created.key))
+                    return JiraCreateIssueResult.Fail("O Jira respondeu, mas não retornou a chave da issue.");
+
+                return JiraCreateIssueResult.Ok(created.id, created.key);
+            }
+            catch (Exception exception)
+            {
+                return JiraCreateIssueResult.Fail(
+                    $"Issue possivelmente criada, mas a resposta não pôde ser lida: {exception.Message}");
+            }
+        }
+
+        /// <summary>Moves an issue into a sprint. Returns null on success or an error message.</summary>
+        public async Task<string> MoveIssueToSprintAsync(int sprintId, string issueKey)
+        {
+            string body = "{\"issues\":[\"" + issueKey + "\"]}";
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPOST,
+                $"/rest/agile/1.0/sprint/{sprintId}/issue",
+                body);
+
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        // --- HTTP core ------------------------------------------------------
+
+        private sealed class JiraResponse
+        {
+            public bool Success;
+            public long StatusCode;
+            public string Body;
+            public string Error;
+        }
+
+        private Task<JiraResponse> SendAsync(string method, string relativePath, string jsonBody)
+        {
+            var completion = new TaskCompletionSource<JiraResponse>();
+            string url = _baseUrl + relativePath;
+
+            UnityWebRequest request;
+            if (method == UnityWebRequest.kHttpVerbPOST || method == UnityWebRequest.kHttpVerbPUT)
+            {
+                request = new UnityWebRequest(url, method)
+                {
+                    uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(jsonBody ?? string.Empty)),
+                    downloadHandler = new DownloadHandlerBuffer()
+                };
+                request.SetRequestHeader("Content-Type", "application/json");
+            }
+            else
+            {
+                request = UnityWebRequest.Get(url);
+            }
+
+            request.timeout = 30;
             request.SetRequestHeader("Authorization", _authProvider.BuildAuthorizationHeader());
             request.SetRequestHeader("Accept", "application/json");
 
@@ -42,22 +200,15 @@ namespace OxenteGames.JiraCommunication.API
 
                 try
                 {
-                    if (request.result == UnityWebRequest.Result.Success)
+                    bool success = request.result == UnityWebRequest.Result.Success;
+                    var response = new JiraResponse
                     {
-                        T payload = JsonUtility.FromJson<T>(request.downloadHandler.text);
-                        completion.TrySetResult(JiraConnectionResult.Ok(payload as JiraUser));
-                        return;
-                    }
-
-                    completion.TrySetResult(JiraConnectionResult.Fail(
-                        request.responseCode,
-                        BuildFriendlyError(request)));
-                }
-                catch (Exception exception)
-                {
-                    completion.TrySetResult(JiraConnectionResult.Fail(
-                        request.responseCode,
-                        $"Não foi possível processar a resposta do Jira: {exception.Message}"));
+                        Success = success,
+                        StatusCode = request.responseCode,
+                        Body = request.downloadHandler != null ? request.downloadHandler.text : string.Empty,
+                        Error = success ? null : BuildFriendlyError(request)
+                    };
+                    completion.TrySetResult(response);
                 }
                 finally
                 {
@@ -69,6 +220,64 @@ namespace OxenteGames.JiraCommunication.API
             return completion.Task;
         }
 
+        private static void ThrowIfFailed(JiraResponse response, string fallbackMessage)
+        {
+            if (!response.Success)
+                throw new Exception(string.IsNullOrEmpty(response.Error) ? fallbackMessage : response.Error);
+        }
+
+        private static List<T> ToList<T>(T[] values)
+        {
+            return values != null ? new List<T>(values) : new List<T>();
+        }
+
+        private static string BuildIssueError(JiraResponse response)
+        {
+            string parsed = ExtractJiraErrors(response.Body);
+            if (!string.IsNullOrEmpty(parsed))
+                return parsed;
+
+            return string.IsNullOrEmpty(response.Error)
+                ? $"Falha HTTP {response.StatusCode}."
+                : response.Error;
+        }
+
+        private static string ExtractJiraErrors(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return null;
+
+            var messages = new List<string>();
+
+            try
+            {
+                var payload = JsonUtility.FromJson<JiraErrorPayload>(body);
+                if (payload?.errorMessages != null)
+                    messages.AddRange(payload.errorMessages);
+            }
+            catch
+            {
+                // Ignore: fall back to the field-level extraction below.
+            }
+
+            // Field-level errors arrive as {"errors":{"summary":"..."}} which
+            // JsonUtility cannot parse into a dictionary, so read them lightly.
+            int errorsIndex = body.IndexOf("\"errors\":{", StringComparison.Ordinal);
+            if (errorsIndex >= 0)
+            {
+                int open = body.IndexOf('{', errorsIndex);
+                int close = open >= 0 ? body.IndexOf('}', open) : -1;
+                if (open >= 0 && close > open + 1)
+                {
+                    string inner = body.Substring(open + 1, close - open - 1).Trim();
+                    if (inner.Length > 0)
+                        messages.Add(inner.Replace("\"", string.Empty));
+                }
+            }
+
+            return messages.Count > 0 ? string.Join("\n", messages) : null;
+        }
+
         private static string BuildFriendlyError(UnityWebRequest request)
         {
             switch (request.responseCode)
@@ -76,7 +285,7 @@ namespace OxenteGames.JiraCommunication.API
                 case 0:
                     return "Não foi possível alcançar o Jira. Verifique a URL, a internet, VPN ou proxy da empresa.";
                 case 400:
-                    return "O Jira rejeitou a solicitação. Confira a URL informada.";
+                    return "O Jira rejeitou a solicitação. Confira os dados informados.";
                 case 401:
                     return "E-mail ou API Token inválido, expirado ou bloqueado pela organização.";
                 case 403:
