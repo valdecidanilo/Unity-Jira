@@ -82,7 +82,9 @@ namespace OxenteGames.JiraCommunication
             icon.style.unityTextAlign = TextAnchor.MiddleCenter;
             icon.style.fontSize = 18;
             icon.style.unityFontStyleAndWeight = FontStyle.Bold;
-            icon.style.backgroundColor = new Color32(38, 132, 255, 255);
+            icon.style.backgroundColor = new StyleColor(
+                new Color32(38, 132, 255, 255)
+            );
             icon.style.color = Color.white;
             icon.style.borderTopLeftRadius = 7;
             icon.style.borderTopRightRadius = 7;
