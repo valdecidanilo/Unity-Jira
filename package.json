@@ -1,0 +1,17 @@
+{
+  "name": "com.oxentegames.unity-jira",
+  "version": "0.1.0",
+  "displayName": "Jira Communication",
+  "description": "Professional Unity Editor integration base for Jira Cloud using email and API token authentication.",
+  "unity": "2021.3",
+  "keywords": [
+    "jira",
+    "atlassian",
+    "editor",
+    "workflow",
+    "issues"
+  ],
+  "author": {
+    "name": "Oxente Games"
+  }
+}
