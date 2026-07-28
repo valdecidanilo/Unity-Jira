@@ -14,6 +14,9 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string PresetPriorityKey = BaseKey + "Preset.PriorityId";
         private const string PresetAssigneeKey = BaseKey + "Preset.AssigneeAccountId";
         private const string PresetTeamKey = BaseKey + "Preset.TeamValue";
+        private const string AiTokenSessionKey = BaseKey + "Ai.Token.Session";
+        private const string AiModelKey = BaseKey + "Ai.Model";
+        private const string AiProviderKey = BaseKey + "Ai.Provider";
 
         public static string BaseUrl
         {
@@ -83,6 +86,37 @@ namespace OxenteGames.JiraCommunication.Settings
         {
             get => EditorPrefs.GetString(PresetTeamKey, string.Empty);
             set => EditorPrefs.SetString(PresetTeamKey, value ?? string.Empty);
+        }
+
+        // AI assistant. Provider is persisted; tokens are session-only (like the Jira token).
+        public const string ProviderAnthropic = "anthropic";
+        public const string ProviderOpenAi = "openai";
+
+        public static string AiProvider
+        {
+            get => EditorPrefs.GetString(AiProviderKey, ProviderAnthropic);
+            set => EditorPrefs.SetString(AiProviderKey, string.IsNullOrEmpty(value) ? ProviderAnthropic : value);
+        }
+
+        public static string GetAiToken(string provider)
+        {
+            return SessionState.GetString(AiTokenSessionKey + "." + provider, string.Empty);
+        }
+
+        public static void SetAiToken(string provider, string value)
+        {
+            SessionState.SetString(AiTokenSessionKey + "." + provider, value ?? string.Empty);
+        }
+
+        public static string GetAiModel(string provider)
+        {
+            string fallback = provider == ProviderOpenAi ? "gpt-4o" : "claude-sonnet-5";
+            return EditorPrefs.GetString(AiModelKey + "." + provider, fallback);
+        }
+
+        public static void SetAiModel(string provider, string value)
+        {
+            EditorPrefs.SetString(AiModelKey + "." + provider, value ?? string.Empty);
         }
 
         public static void ClearPresets()

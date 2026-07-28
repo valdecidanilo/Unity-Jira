@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OxenteGames.JiraCommunication.AI;
 using OxenteGames.JiraCommunication.API;
 using OxenteGames.JiraCommunication.Models;
 using OxenteGames.JiraCommunication.Settings;
@@ -78,6 +79,20 @@ namespace OxenteGames.JiraCommunication
         private string _attachmentPath = string.Empty;
         private Label _attachmentLabel;
 
+        // AI assistant
+        private TextField _aiPromptField;
+        private Button _aiGenerateButton;
+        private bool _isAiBusy;
+        private static readonly string[] ClaudeModelLabels = { "Claude Sonnet 5", "Claude Haiku 4.5", "Claude Opus 5" };
+        private static readonly string[] ClaudeModelIds = { "claude-sonnet-5", "claude-haiku-4-5", "claude-opus-5" };
+        private static readonly string[] OpenAiModelLabels = { "GPT-4o", "GPT-4o mini", "GPT-4.1" };
+        private static readonly string[] OpenAiModelIds = { "gpt-4o", "gpt-4o-mini", "gpt-4.1" };
+
+        // Epic progress
+        private VisualElement _epicProgressContainer;
+        private Label _epicProgressLabel;
+        private VisualElement _epicProgressFill;
+
         private readonly List<JiraProject> _projects = new List<JiraProject>();
         private readonly List<JiraIssueType> _issueTypes = new List<JiraIssueType>();
         private readonly List<JiraEpic> _epics = new List<JiraEpic>();
@@ -144,8 +159,32 @@ namespace OxenteGames.JiraCommunication
             scroll.Add(_createPanel);
             scroll.Add(_settingsPanel);
 
+            BuildBrandFooter();
+
             RefreshConnectionState();
             SelectTab(_activeTab);
+        }
+
+        private void BuildBrandFooter()
+        {
+            var footer = new VisualElement();
+            footer.style.flexDirection = FlexDirection.Row;
+            footer.style.alignItems = Align.Center;
+            footer.style.paddingLeft = 22;
+            footer.style.paddingRight = 22;
+            footer.style.paddingTop = 8;
+            footer.style.paddingBottom = 8;
+            footer.style.backgroundColor = new StyleColor(new Color32(40, 44, 52, 255));
+            footer.style.borderTopWidth = 1;
+            footer.style.borderTopColor = new StyleColor(new Color32(67, 73, 84, 255));
+
+            var brand = new Label("OxenteGames");
+            brand.style.fontSize = 11;
+            brand.style.unityFontStyleAndWeight = FontStyle.Bold;
+            brand.style.color = new StyleColor(new Color32(173, 181, 194, 255));
+            footer.Add(brand);
+
+            rootVisualElement.Add(footer);
         }
 
         // --- Header & tabs --------------------------------------------------
@@ -364,6 +403,7 @@ namespace OxenteGames.JiraCommunication
             _createForm.Add(BuildDestinationCard());
             _createForm.Add(BuildClassifyCard());
             _createForm.Add(BuildDatesCard());
+            _createForm.Add(BuildAiCard());
             _createForm.Add(BuildDetailsCard());
             _createForm.Add(BuildAttachmentCard());
             _createForm.Add(BuildFooter());
@@ -406,6 +446,7 @@ namespace OxenteGames.JiraCommunication
             _epicDropdown = new DropdownField(L.Tr(L.K.FieldEpic));
             _epicDropdown.tooltip = L.Tr(L.K.FieldEpicTooltip);
             JiraStyles.ApplyDropdown(_epicDropdown);
+            _epicDropdown.RegisterValueChangedCallback(_ => OnEpicSelected());
             _epicContainer.Add(_epicDropdown);
 
             _sprintDropdown = new DropdownField(L.Tr(L.K.FieldSprint));
@@ -413,6 +454,7 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplyDropdown(_sprintDropdown);
 
             card.Add(JiraStyles.Row(_epicContainer, _sprintDropdown));
+            card.Add(BuildEpicProgress());
 
             var refreshButton = new Button(() => ReloadProjectsAsync()) { text = L.Tr(L.K.BtnReloadProjects) };
             JiraStyles.ApplyGhostButton(refreshButton);
@@ -505,6 +547,120 @@ namespace OxenteGames.JiraCommunication
             return card;
         }
 
+        private VisualElement BuildAiCard()
+        {
+            var card = new VisualElement();
+            JiraStyles.ApplyCard(card);
+
+            var title = new Label(L.Tr(L.K.AiSectionTitle));
+            JiraStyles.ApplySectionTitle(title);
+            card.Add(title);
+
+            _aiPromptField = new TextField(L.Tr(L.K.AiPromptLabel));
+            JiraStyles.ApplyMultiline(_aiPromptField);
+            _aiPromptField.style.minHeight = 56;
+            card.Add(_aiPromptField);
+
+            _aiGenerateButton = new Button(GenerateWithAiAsync) { text = L.Tr(L.K.BtnAiGenerate) };
+            JiraStyles.ApplySecondaryButton(_aiGenerateButton);
+            card.Add(_aiGenerateButton);
+
+            return card;
+        }
+
+        private async void GenerateWithAiAsync()
+        {
+            if (_isAiBusy)
+                return;
+
+            string provider = JiraPreferences.AiProvider;
+            string token = JiraPreferences.GetAiToken(provider);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                SetCreateStatus(L.Tr(L.K.MsgAiNoToken), false);
+                SelectTab(Tab.Settings);
+                return;
+            }
+
+            string input = _aiPromptField.value?.Trim();
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                SetCreateStatus(L.Tr(L.K.MsgAiNoInput), false);
+                return;
+            }
+
+            JiraProject project = SelectedProject();
+            JiraIssueType type = SelectedIssueType();
+
+            var priorityNames = new List<string>();
+            if (_priorityMeta?.allowedValues != null)
+            {
+                foreach (JiraAllowedValue value in _priorityMeta.allowedValues)
+                    priorityNames.Add(value.Display);
+            }
+
+            SetAiBusy(true);
+            SetCreateStatus(L.Tr(L.K.MsgAiGenerating), true);
+
+            try
+            {
+                string model = JiraPreferences.GetAiModel(provider);
+                IAiIssueClient client = provider == JiraPreferences.ProviderOpenAi
+                    ? (IAiIssueClient)new OpenAiClient(token, model)
+                    : new ClaudeClient(token, model);
+
+                AiSuggestion suggestion = await client.SuggestIssueAsync(
+                    input, project?.name, type?.name, priorityNames, L.Current != L.En);
+
+                if (!string.IsNullOrWhiteSpace(suggestion.title))
+                    _summaryField.value = suggestion.title.Trim();
+
+                if (!string.IsNullOrWhiteSpace(suggestion.description))
+                    _descriptionField.value = suggestion.description;
+
+                if (!string.IsNullOrWhiteSpace(suggestion.priority))
+                    SelectPriorityByName(suggestion.priority);
+
+                SetCreateStatus(L.Tr(L.K.MsgAiDone), true);
+            }
+            catch (Exception exception)
+            {
+                SetCreateStatus(L.Tr(L.K.MsgAiFailed, exception.Message), false);
+            }
+            finally
+            {
+                SetAiBusy(false);
+            }
+        }
+
+        private void SelectPriorityByName(string name)
+        {
+            if (_priorityDropdown == null || _priorityMeta?.allowedValues == null)
+                return;
+
+            string lower = name.Trim().ToLowerInvariant();
+            for (int i = 0; i < _priorityMeta.allowedValues.Length; i++)
+            {
+                JiraAllowedValue value = _priorityMeta.allowedValues[i];
+                string display = (value.Display ?? string.Empty).ToLowerInvariant();
+                string plain = (value.name ?? string.Empty).ToLowerInvariant();
+
+                if (display == lower || plain == lower ||
+                    (display.Length > 0 && (display.Contains(lower) || lower.Contains(display))))
+                {
+                    _priorityDropdown.index = i;
+                    return;
+                }
+            }
+        }
+
+        private void SetAiBusy(bool busy)
+        {
+            _isAiBusy = busy;
+            _aiGenerateButton.SetEnabled(!busy);
+            _aiGenerateButton.text = busy ? L.Tr(L.K.BtnAiGenerating) : L.Tr(L.K.BtnAiGenerate);
+        }
+
         private VisualElement BuildFooter()
         {
             var footer = new VisualElement();
@@ -591,6 +747,8 @@ namespace OxenteGames.JiraCommunication
             languageCard.Add(languageDropdown);
             panel.Add(languageCard);
 
+            panel.Add(BuildAiSettingsCard());
+
             var dataCard = new VisualElement();
             JiraStyles.ApplyCard(dataCard);
 
@@ -614,6 +772,76 @@ namespace OxenteGames.JiraCommunication
 
             panel.Add(dataCard);
             return panel;
+        }
+
+        private VisualElement BuildAiSettingsCard()
+        {
+            var card = new VisualElement();
+            JiraStyles.ApplyCard(card);
+
+            var title = new Label(L.Tr(L.K.AiSettingsTitle));
+            JiraStyles.ApplySectionTitle(title);
+            card.Add(title);
+
+            var note = new Label(L.Tr(L.K.AiSettingsNote));
+            JiraStyles.ApplyMuted(note);
+            note.style.marginBottom = 12;
+            card.Add(note);
+
+            string provider = JiraPreferences.AiProvider;
+            bool isOpenAi = provider == JiraPreferences.ProviderOpenAi;
+
+            var providerDropdown = new DropdownField(L.Tr(L.K.AiProviderLabel))
+            {
+                choices = new List<string> { L.Tr(L.K.ProviderClaude), L.Tr(L.K.ProviderOpenAi) }
+            };
+            providerDropdown.index = isOpenAi ? 1 : 0;
+            JiraStyles.ApplyDropdown(providerDropdown);
+            providerDropdown.RegisterValueChangedCallback(_ =>
+            {
+                JiraPreferences.AiProvider = providerDropdown.index == 1
+                    ? JiraPreferences.ProviderOpenAi
+                    : JiraPreferences.ProviderAnthropic;
+                _activeTab = Tab.Settings;
+                CreateGUI();
+            });
+            card.Add(providerDropdown);
+
+            var tokenField = new TextField(L.Tr(L.K.AiTokenLabel))
+            {
+                value = JiraPreferences.GetAiToken(provider),
+                isPasswordField = true
+            };
+            JiraStyles.ApplyField(tokenField);
+            tokenField.RegisterValueChangedCallback(evt => JiraPreferences.SetAiToken(provider, evt.newValue));
+            card.Add(tokenField);
+
+            string[] modelLabels = isOpenAi ? OpenAiModelLabels : ClaudeModelLabels;
+            string[] modelIds = isOpenAi ? OpenAiModelIds : ClaudeModelIds;
+
+            var modelDropdown = new DropdownField(L.Tr(L.K.AiModelLabel))
+            {
+                choices = new List<string>(modelLabels)
+            };
+            int modelIndex = Array.IndexOf(modelIds, JiraPreferences.GetAiModel(provider));
+            modelDropdown.index = modelIndex >= 0 ? modelIndex : 0;
+            JiraStyles.ApplyDropdown(modelDropdown);
+            modelDropdown.RegisterValueChangedCallback(_ =>
+            {
+                int index = modelDropdown.index;
+                if (index >= 0 && index < modelIds.Length)
+                    JiraPreferences.SetAiModel(provider, modelIds[index]);
+            });
+            card.Add(modelDropdown);
+
+            string keyUrl = isOpenAi
+                ? "https://platform.openai.com/api-keys"
+                : "https://console.anthropic.com/settings/keys";
+            var getKeyButton = new Button(() => Application.OpenURL(keyUrl)) { text = L.Tr(L.K.BtnGetAiKey) };
+            JiraStyles.ApplySecondaryButton(getKeyButton);
+            card.Add(getKeyButton);
+
+            return card;
         }
 
         private void ClearPresets()
@@ -771,6 +999,9 @@ namespace OxenteGames.JiraCommunication
 
             _epicDropdown.choices = labels;
             _epicDropdown.SetValueWithoutNotify(labels[0]);
+
+            if (_epicProgressContainer != null)
+                _epicProgressContainer.style.display = DisplayStyle.None;
         }
 
         private void PopulateSprintChoices()
@@ -782,6 +1013,79 @@ namespace OxenteGames.JiraCommunication
             _sprintDropdown.choices = labels;
             _sprintDropdown.SetValueWithoutNotify(labels[0]);
             _sprintDropdown.SetEnabled(_sprints.Count > 0);
+        }
+
+        private VisualElement BuildEpicProgress()
+        {
+            _epicProgressContainer = new VisualElement();
+            _epicProgressContainer.style.marginBottom = 10;
+
+            _epicProgressLabel = new Label();
+            JiraStyles.ApplyFieldHint(_epicProgressLabel);
+            _epicProgressLabel.style.marginTop = 0;
+            _epicProgressLabel.style.marginBottom = 4;
+            _epicProgressContainer.Add(_epicProgressLabel);
+
+            var track = new VisualElement();
+            track.style.height = 8;
+            track.style.backgroundColor = new StyleColor(new Color32(47, 52, 61, 255));
+            track.style.borderTopLeftRadius = 4;
+            track.style.borderTopRightRadius = 4;
+            track.style.borderBottomLeftRadius = 4;
+            track.style.borderBottomRightRadius = 4;
+            track.style.overflow = Overflow.Hidden;
+
+            _epicProgressFill = new VisualElement();
+            _epicProgressFill.style.height = 8;
+            _epicProgressFill.style.width = Length.Percent(0);
+            _epicProgressFill.style.backgroundColor = new StyleColor(new Color32(54, 179, 126, 255));
+            track.Add(_epicProgressFill);
+
+            _epicProgressContainer.Add(track);
+            _epicProgressContainer.style.display = DisplayStyle.None;
+            return _epicProgressContainer;
+        }
+
+        private async void OnEpicSelected()
+        {
+            JiraEpic epic = SelectedEpic();
+            if (epic == null)
+            {
+                _epicProgressContainer.style.display = DisplayStyle.None;
+                return;
+            }
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+                return;
+
+            _epicProgressContainer.style.display = DisplayStyle.Flex;
+            _epicProgressLabel.text = L.Tr(L.K.EpicProgressLoading);
+            _epicProgressFill.style.width = Length.Percent(0);
+
+            try
+            {
+                JiraEpicProgress progress = await client.GetEpicProgressAsync(epic.key);
+
+                // The selected epic may have changed while the request was in flight.
+                if (SelectedEpic() != epic)
+                    return;
+
+                if (progress.Total == 0)
+                {
+                    _epicProgressLabel.text = L.Tr(L.K.EpicProgressEmpty);
+                    _epicProgressFill.style.width = Length.Percent(0);
+                    return;
+                }
+
+                _epicProgressLabel.text = L.Tr(L.K.EpicProgressFormat, progress.Done, progress.Total, progress.Percent);
+                _epicProgressFill.style.width = Length.Percent(progress.Percent);
+            }
+            catch
+            {
+                _epicProgressLabel.text = L.Tr(L.K.EpicProgressFailed);
+                _epicProgressFill.style.width = Length.Percent(0);
+            }
         }
 
         private async void OnTypeSelected()

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 - 2026-07-27
+
+- Suporte a **ChatGPT (OpenAI)** além do Claude, com seletor de provedor nas Configurações (token e modelo por provedor).
+- Ao selecionar um **épico**, mostra a **porcentagem de conclusão** (itens concluídos / total) com barra de progresso.
+- Fallback de progresso do épico para projetos team-managed (via campo `parent`).
+- Rodapé com a marca "OxenteGames".
+
+## 0.4.0 - 2026-07-27
+
+- Assistente de IA (Claude) na criação de issues: gera título, descrição e prioridade a partir de uma breve descrição.
+- Cada usuário informa sua própria API Key da Anthropic (mantida apenas na sessão do Unity).
+- Seleção de modelo (Sonnet 5, Haiku 4.5, Opus 5) nas Configurações.
+- Integração via HTTP com a Messages API da Anthropic (sem dependências externas).
+
 ## 0.3.0 - 2026-07-27
 
 - Formulário de criação dividido em seções (Destino, Classificação, Datas, Detalhes, Anexo) com layout de duas colunas.

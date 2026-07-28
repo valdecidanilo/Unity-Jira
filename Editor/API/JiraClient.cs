@@ -191,6 +191,48 @@ namespace OxenteGames.JiraCommunication.API
             return ToList(page?.values);
         }
 
+        /// <summary>Completion of an epic based on its child issues (done vs total).</summary>
+        public async Task<JiraEpicProgress> GetEpicProgressAsync(string epicKey)
+        {
+            string encoded = UnityWebRequest.EscapeURL(epicKey);
+
+            // Agile API (works well on company-managed boards).
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/agile/1.0/epic/{encoded}/issue?fields=status&maxResults=200",
+                null);
+
+            JiraIssueSearchPage page = response.Success
+                ? JsonUtility.FromJson<JiraIssueSearchPage>(response.Body)
+                : null;
+
+            // Fallback for team-managed projects: children link via the parent field.
+            if (page?.issues == null || page.issues.Length == 0)
+            {
+                string jql = UnityWebRequest.EscapeURL($"parent = \"{epicKey}\"");
+                JiraResponse search = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    $"/rest/api/3/search?jql={jql}&fields=status&maxResults=200",
+                    null);
+
+                page = search.Success
+                    ? JsonUtility.FromJson<JiraIssueSearchPage>(search.Body)
+                    : null;
+            }
+
+            if (page?.issues == null)
+                return new JiraEpicProgress(0, 0);
+
+            int done = 0;
+            foreach (JiraChildIssue issue in page.issues)
+            {
+                if (issue?.fields?.status?.statusCategory?.key == "done")
+                    done++;
+            }
+
+            return new JiraEpicProgress(done, page.issues.Length);
+        }
+
         // --- Mutations ------------------------------------------------------
 
         public async Task<JiraCreateIssueResult> CreateIssueAsync(JiraIssueDraft draft)

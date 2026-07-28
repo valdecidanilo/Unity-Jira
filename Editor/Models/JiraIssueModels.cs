@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace OxenteGames.JiraCommunication.Models
 {
@@ -158,5 +159,53 @@ namespace OxenteGames.JiraCommunication.Models
     internal sealed class JiraUserList
     {
         public JiraUser[] items;
+    }
+
+    // --- Epic progress (child issues by status) ---
+
+    [Serializable]
+    internal sealed class JiraStatusCategoryRef
+    {
+        public string key;   // "new" | "indeterminate" | "done"
+        public string name;
+    }
+
+    [Serializable]
+    internal sealed class JiraIssueStatus
+    {
+        public JiraStatusCategoryRef statusCategory;
+    }
+
+    [Serializable]
+    internal sealed class JiraChildIssueFields
+    {
+        public JiraIssueStatus status;
+    }
+
+    [Serializable]
+    internal sealed class JiraChildIssue
+    {
+        public string key;
+        public JiraChildIssueFields fields;
+    }
+
+    [Serializable]
+    internal sealed class JiraIssueSearchPage
+    {
+        public JiraChildIssue[] issues;
+        public int total;
+    }
+
+    internal sealed class JiraEpicProgress
+    {
+        public int Done { get; }
+        public int Total { get; }
+        public int Percent => Total > 0 ? Mathf.RoundToInt(Done * 100f / Total) : 0;
+
+        public JiraEpicProgress(int done, int total)
+        {
+            Done = done;
+            Total = total;
+        }
     }
 }

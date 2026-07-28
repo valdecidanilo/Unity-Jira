@@ -168,6 +168,36 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.SettingsClearPresets] = new[] { "Limpar campos salvos (presets)", "Clear saved fields (presets)" },
             [K.MsgPresetsCleared] = new[] { "Presets removidos.", "Presets cleared." },
 
+            [K.AiProviderLabel] = new[] { "Provedor de IA", "AI provider" },
+            [K.ProviderClaude] = new[] { "Claude (Anthropic)", "Claude (Anthropic)" },
+            [K.ProviderOpenAi] = new[] { "ChatGPT (OpenAI)", "ChatGPT (OpenAI)" },
+            [K.EpicProgressLoading] = new[] { "Calculando conclusão do épico...", "Calculating epic completion..." },
+            [K.EpicProgressFormat] = new[] { "Conclusão do épico: {0}/{1} itens ({2}%)", "Epic completion: {0}/{1} items ({2}%)" },
+            [K.EpicProgressEmpty] = new[] { "Este épico ainda não tem itens.", "This epic has no items yet." },
+            [K.EpicProgressFailed] = new[] { "Não foi possível calcular a conclusão do épico.", "Could not calculate epic completion." },
+            [K.AiSettingsTitle] = new[] { "Assistente de IA", "AI Assistant" },
+            [K.AiSettingsNote] = new[]
+            {
+                "Escolha o provedor e informe sua própria API Key. A chave fica apenas na sessão atual do Unity.",
+                "Choose the provider and enter your own API Key. The key stays only in the current Unity session."
+            },
+            [K.AiTokenLabel] = new[] { "API Key", "API Key" },
+            [K.AiModelLabel] = new[] { "Modelo", "Model" },
+            [K.BtnGetAiKey] = new[] { "Obter API Key", "Get API Key" },
+            [K.AiSectionTitle] = new[] { "Assistente de IA", "AI Assistant" },
+            [K.AiPromptLabel] = new[] { "Descreva a atividade (a IA gera título, descrição e prioridade)", "Describe the task (AI drafts title, description and priority)" },
+            [K.BtnAiGenerate] = new[] { "Gerar com IA", "Draft with AI" },
+            [K.BtnAiGenerating] = new[] { "Gerando...", "Drafting..." },
+            [K.MsgAiNoToken] = new[]
+            {
+                "Configure sua API Key de IA na aba Configurações.",
+                "Set your AI API Key on the Settings tab."
+            },
+            [K.MsgAiNoInput] = new[] { "Descreva a atividade para a IA gerar.", "Describe the task for the AI to draft." },
+            [K.MsgAiGenerating] = new[] { "Gerando com IA...", "Drafting with AI..." },
+            [K.MsgAiDone] = new[] { "Campos preenchidos pela IA. Revise antes de criar.", "Fields drafted by AI. Review before creating." },
+            [K.MsgAiFailed] = new[] { "Falha na IA: {0}", "AI error: {0}" },
+
             [K.SettingsTitle] = new[] { "Configurações", "Settings" },
             [K.SettingsLanguage] = new[] { "Idioma / Language", "Language / Idioma" },
             [K.LangPortuguese] = new[] { "Português", "Portuguese" },
@@ -258,6 +288,27 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAttachmentFailed = "MsgAttachmentFailed";
             public const string SettingsClearPresets = "SettingsClearPresets";
             public const string MsgPresetsCleared = "MsgPresetsCleared";
+            public const string AiProviderLabel = "AiProviderLabel";
+            public const string ProviderClaude = "ProviderClaude";
+            public const string ProviderOpenAi = "ProviderOpenAi";
+            public const string EpicProgressLoading = "EpicProgressLoading";
+            public const string EpicProgressFormat = "EpicProgressFormat";
+            public const string EpicProgressEmpty = "EpicProgressEmpty";
+            public const string EpicProgressFailed = "EpicProgressFailed";
+            public const string AiSettingsTitle = "AiSettingsTitle";
+            public const string AiSettingsNote = "AiSettingsNote";
+            public const string AiTokenLabel = "AiTokenLabel";
+            public const string AiModelLabel = "AiModelLabel";
+            public const string BtnGetAiKey = "BtnGetAiKey";
+            public const string AiSectionTitle = "AiSectionTitle";
+            public const string AiPromptLabel = "AiPromptLabel";
+            public const string BtnAiGenerate = "BtnAiGenerate";
+            public const string BtnAiGenerating = "BtnAiGenerating";
+            public const string MsgAiNoToken = "MsgAiNoToken";
+            public const string MsgAiNoInput = "MsgAiNoInput";
+            public const string MsgAiGenerating = "MsgAiGenerating";
+            public const string MsgAiDone = "MsgAiDone";
+            public const string MsgAiFailed = "MsgAiFailed";
             public const string SettingsTitle = "SettingsTitle";
             public const string SettingsLanguage = "SettingsLanguage";
             public const string LangPortuguese = "LangPortuguese";

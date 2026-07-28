@@ -11,14 +11,15 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 - Aba **Criar Issue** com criação de história, tarefa, bug e subtask, em seções organizadas:
   - Seleção de projeto e tipo de issue carregados dinamicamente dos metadados (`createmeta`).
   - Título, descrição (convertida para Atlassian Document Format) e issue pai para subtasks.
-  - Listagem de **épicos** ativos para vínculo (projetos team-managed).
+  - Listagem de **épicos** ativos para vínculo (projetos team-managed), com **porcentagem de conclusão** e barra de progresso ao selecionar.
   - Listagem de **sprints ativas**; a issue é movida para a sprint escolhida após ser criada.
   - **Prioridade**, **Responsável** (com "Atribuir a mim"), **Time/Equipe** e **datas** descobertos por projeto/tipo — só aparecem se o projeto os expõe.
   - **Anexo** de arquivo/print enviado após a criação.
   - **Presets** salvos no Editor (projeto, tipo, prioridade, responsável, time) para não reselecionar tudo a cada criação.
   - Botão para abrir a issue recém-criada direto no Jira.
 - Troca automática para a aba de criação quando a conexão é validada.
-- Aba **Configurações**: idioma (Português / Inglês) e limpeza dos dados de conexão salvos.
+- **Assistente de IA** na aba Criar: descreva a atividade em poucas palavras e a IA preenche título, descrição e prioridade. Suporta **Claude (Anthropic)** e **ChatGPT (OpenAI)** — cada usuário usa sua própria API Key (mantida só na sessão do Unity), com escolha de provedor e modelo nas Configurações.
+- Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA e limpeza dos dados de conexão salvos.
 - Mensagens amigáveis para erros HTTP comuns.
 - URL e e-mail salvos apenas nas preferências locais do Editor.
 - API Token mantido somente na sessão atual do Unity por padrão.
