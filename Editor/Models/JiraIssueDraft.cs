@@ -33,19 +33,78 @@ namespace OxenteGames.JiraCommunication.Models
         public void SetFieldId(string fieldId, string id)
         {
             if (!string.IsNullOrWhiteSpace(id))
-                SetFieldRaw(fieldId, "{\"id\":\"" + JsonEscape(id) + "\"}");
+                SetFieldObject(fieldId, "id", id);
         }
 
         public void SetFieldValueObject(string fieldId, string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
-                SetFieldRaw(fieldId, "{\"value\":\"" + JsonEscape(value) + "\"}");
+                SetFieldObject(fieldId, "value", value);
         }
 
         public void SetFieldString(string fieldId, string text)
         {
             if (!string.IsNullOrWhiteSpace(text))
                 SetFieldRaw(fieldId, "\"" + JsonEscape(text) + "\"");
+        }
+
+        public void SetFieldAdf(string fieldId, string text)
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+                SetFieldRaw(fieldId, BuildAdf(text));
+        }
+
+        public void SetFieldBoolean(string fieldId, bool value)
+        {
+            SetFieldRaw(fieldId, value ? "true" : "false");
+        }
+
+        public void SetFieldNumber(string fieldId, string invariantValue)
+        {
+            if (!string.IsNullOrWhiteSpace(invariantValue))
+                SetFieldRaw(fieldId, invariantValue);
+        }
+
+        public void SetFieldObject(string fieldId, string propertyName, string value)
+        {
+            if (string.IsNullOrWhiteSpace(propertyName) || string.IsNullOrWhiteSpace(value))
+                return;
+
+            SetFieldRaw(
+                fieldId,
+                "{\"" + JsonEscape(propertyName) + "\":\"" + JsonEscape(value) + "\"}");
+        }
+
+        public void SetFieldStringArray(string fieldId, IEnumerable<string> values)
+        {
+            SetFieldRaw(fieldId, BuildStringArray(values));
+        }
+
+        public void SetFieldObjectArray(
+            string fieldId,
+            IEnumerable<KeyValuePair<string, string>> values)
+        {
+            var sb = new StringBuilder("[");
+            bool hasValue = false;
+
+            foreach (KeyValuePair<string, string> value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value.Key) || string.IsNullOrWhiteSpace(value.Value))
+                    continue;
+
+                if (hasValue)
+                    sb.Append(',');
+
+                sb.Append("{\"")
+                  .Append(JsonEscape(value.Key))
+                  .Append("\":\"")
+                  .Append(JsonEscape(value.Value))
+                  .Append("\"}");
+                hasValue = true;
+            }
+
+            sb.Append(']');
+            SetFieldRaw(fieldId, sb.ToString());
         }
 
         public string ToJson()
@@ -92,6 +151,26 @@ namespace OxenteGames.JiraCommunication.Models
 
             sb.Append("]}");
             return sb.ToString();
+        }
+
+        private static string BuildStringArray(IEnumerable<string> values)
+        {
+            var sb = new StringBuilder("[");
+            bool hasValue = false;
+
+            foreach (string value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                if (hasValue)
+                    sb.Append(',');
+
+                sb.Append('"').Append(JsonEscape(value.Trim())).Append('"');
+                hasValue = true;
+            }
+
+            return sb.Append(']').ToString();
         }
 
         public static string JsonEscape(string value)

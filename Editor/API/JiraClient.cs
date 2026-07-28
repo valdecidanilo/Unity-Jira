@@ -80,7 +80,8 @@ namespace OxenteGames.JiraCommunication.API
             if (response.Success)
             {
                 var page = JsonUtility.FromJson<JiraIssueTypePage>(response.Body);
-                List<JiraIssueType> types = ToList(page?.values);
+                List<JiraIssueType> types =
+                    ToList(page?.issueTypes ?? page?.values);
                 if (types.Count > 0)
                     return types;
             }
@@ -115,38 +116,105 @@ namespace OxenteGames.JiraCommunication.API
         /// <summary>Fields available when creating a given issue type in a project.</summary>
         public async Task<List<JiraFieldMeta>> GetCreateFieldsAsync(string projectKey, string issueTypeId)
         {
+            var fields = new List<JiraFieldMeta>();
+            string encodedProject = UnityWebRequest.EscapeURL(projectKey);
+            string encodedType = UnityWebRequest.EscapeURL(issueTypeId);
+            int startAt = 0;
+            int pageCount = 0;
+
+            while (pageCount < 20)
+            {
+                JiraResponse response = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    $"/rest/api/3/issue/createmeta/{encodedProject}/issuetypes/{encodedType}" +
+                    $"?startAt={startAt}&maxResults=100",
+                    null);
+
+                ThrowIfFailed(
+                    response,
+                    "Não foi possível carregar os campos configurados para este tipo de issue.");
+
+                var page = JsonUtility.FromJson<JiraFieldMetaPage>(response.Body);
+                JiraFieldMeta[] pageFields = page?.fields ?? page?.values;
+                if (pageFields == null || pageFields.Length == 0)
+                    break;
+
+                fields.AddRange(pageFields);
+                startAt += pageFields.Length;
+                pageCount++;
+
+                if (page.isLast || (page.total > 0 && startAt >= page.total))
+                    break;
+            }
+
+            return fields;
+        }
+
+        public async Task<List<JiraAllowedValue>> GetPrioritiesAsync()
+        {
             JiraResponse response = await SendAsync(
                 UnityWebRequest.kHttpVerbGET,
-                $"/rest/api/3/issue/createmeta/{UnityWebRequest.EscapeURL(projectKey)}/issuetypes/{UnityWebRequest.EscapeURL(issueTypeId)}?maxResults=200",
+                "/rest/api/3/priority/search?maxResults=100",
                 null);
 
             if (!response.Success)
-                return new List<JiraFieldMeta>();
+                return new List<JiraAllowedValue>();
 
-            var page = JsonUtility.FromJson<JiraFieldMetaPage>(response.Body);
+            var page = JsonUtility.FromJson<JiraAllowedValuePage>(response.Body);
             return ToList(page?.values);
         }
 
         public async Task<List<JiraUser>> GetAssignableUsersAsync(string projectKey)
         {
-            JiraResponse response = await SendAsync(
-                UnityWebRequest.kHttpVerbGET,
-                $"/rest/api/3/user/assignable/search?project={UnityWebRequest.EscapeURL(projectKey)}&maxResults=50",
-                null);
+            var users = new List<JiraUser>();
+            var accountIds = new HashSet<string>();
+            string encodedProject = UnityWebRequest.EscapeURL(projectKey);
+            const int pageSize = 100;
+            int startAt = 0;
 
-            if (!response.Success || string.IsNullOrWhiteSpace(response.Body))
-                return new List<JiraUser>();
+            while (startAt < 2000)
+            {
+                JiraResponse response = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    $"/rest/api/3/user/assignable/search?project={encodedProject}" +
+                    $"&startAt={startAt}&maxResults={pageSize}",
+                    null);
 
-            try
-            {
-                // Body is a top-level JSON array; wrap it so JsonUtility can read it.
-                var wrapped = JsonUtility.FromJson<JiraUserList>("{\"items\":" + response.Body + "}");
-                return ToList(wrapped?.items);
+                if (!response.Success || string.IsNullOrWhiteSpace(response.Body))
+                    break;
+
+                try
+                {
+                    // Body is a top-level JSON array; wrap it so JsonUtility can read it.
+                    var wrapped = JsonUtility.FromJson<JiraUserList>(
+                        "{\"items\":" + response.Body + "}");
+                    JiraUser[] pageUsers = wrapped?.items;
+                    if (pageUsers == null || pageUsers.Length == 0)
+                        break;
+
+                    int added = 0;
+                    foreach (JiraUser user in pageUsers)
+                    {
+                        if (user == null ||
+                            string.IsNullOrWhiteSpace(user.accountId) ||
+                            !accountIds.Add(user.accountId))
+                            continue;
+
+                        users.Add(user);
+                        added++;
+                    }
+
+                    startAt += pageUsers.Length;
+                    if (added == 0)
+                        break;
+                }
+                catch
+                {
+                    break;
+                }
             }
-            catch
-            {
-                return new List<JiraUser>();
-            }
+
+            return users;
         }
 
         public async Task<List<JiraBoard>> GetBoardsAsync(string projectKey)
@@ -191,6 +259,62 @@ namespace OxenteGames.JiraCommunication.API
             return ToList(page?.values);
         }
 
+        /// <summary>
+        /// Returns every epic-level issue from the project, independently of board filters.
+        /// Uses hierarchyLevel instead of the issue type name so renamed epics also work.
+        /// </summary>
+        public async Task<List<JiraEpic>> GetProjectEpicsAsync(string projectKey)
+        {
+            var epics = new List<JiraEpic>();
+            string escapedKey = EscapeJqlString(projectKey);
+            string jql = $"project = \"{escapedKey}\" AND hierarchyLevel = 1 ORDER BY updated DESC";
+            string nextPageToken = null;
+            int pageCount = 0;
+
+            do
+            {
+                string path =
+                    $"/rest/api/3/search/jql?jql={UnityWebRequest.EscapeURL(jql)}" +
+                    "&fields=summary&maxResults=100";
+
+                if (!string.IsNullOrWhiteSpace(nextPageToken))
+                    path += $"&nextPageToken={UnityWebRequest.EscapeURL(nextPageToken)}";
+
+                JiraResponse response = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    path,
+                    null);
+
+                ThrowIfFailed(response, "Não foi possível carregar os épicos do projeto.");
+
+                var page = JsonUtility.FromJson<JiraEpicSearchPage>(response.Body);
+                if (page?.issues == null)
+                    break;
+
+                foreach (JiraEpicSearchIssue issue in page.issues)
+                {
+                    if (issue == null || string.IsNullOrWhiteSpace(issue.key))
+                        continue;
+
+                    int.TryParse(issue.id, out int numericId);
+                    epics.Add(new JiraEpic
+                    {
+                        id = numericId,
+                        key = issue.key,
+                        summary = issue.fields?.summary,
+                        name = issue.fields?.summary,
+                        done = false
+                    });
+                }
+
+                nextPageToken = page.nextPageToken;
+                pageCount++;
+            }
+            while (!string.IsNullOrWhiteSpace(nextPageToken) && pageCount < 20);
+
+            return epics;
+        }
+
         /// <summary>Completion of an epic based on its child issues (done vs total).</summary>
         public async Task<JiraEpicProgress> GetEpicProgressAsync(string epicKey)
         {
@@ -209,10 +333,11 @@ namespace OxenteGames.JiraCommunication.API
             // Fallback for team-managed projects: children link via the parent field.
             if (page?.issues == null || page.issues.Length == 0)
             {
-                string jql = UnityWebRequest.EscapeURL($"parent = \"{epicKey}\"");
+                string jql = UnityWebRequest.EscapeURL(
+                    $"parent = \"{EscapeJqlString(epicKey)}\"");
                 JiraResponse search = await SendAsync(
                     UnityWebRequest.kHttpVerbGET,
-                    $"/rest/api/3/search?jql={jql}&fields=status&maxResults=200",
+                    $"/rest/api/3/search/jql?jql={jql}&fields=status&maxResults=200",
                     null);
 
                 page = search.Success
@@ -461,6 +586,13 @@ namespace OxenteGames.JiraCommunication.API
             }
 
             return normalized;
+        }
+
+        private static string EscapeJqlString(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"");
         }
     }
 }

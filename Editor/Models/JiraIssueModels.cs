@@ -62,6 +62,7 @@ namespace OxenteGames.JiraCommunication.Models
     [Serializable]
     internal sealed class JiraIssueTypePage
     {
+        public JiraIssueType[] issueTypes;
         public JiraIssueType[] values;
     }
 
@@ -81,6 +82,28 @@ namespace OxenteGames.JiraCommunication.Models
     internal sealed class JiraEpicPage
     {
         public JiraEpic[] values;
+    }
+
+    [Serializable]
+    internal sealed class JiraEpicSearchFields
+    {
+        public string summary;
+    }
+
+    [Serializable]
+    internal sealed class JiraEpicSearchIssue
+    {
+        public string id;
+        public string key;
+        public JiraEpicSearchFields fields;
+    }
+
+    [Serializable]
+    internal sealed class JiraEpicSearchPage
+    {
+        public JiraEpicSearchIssue[] issues;
+        public string nextPageToken;
+        public bool isLast;
     }
 
     // Legacy fallback: GET /rest/api/3/issue/createmeta?projectKeys=X&expand=projects.issuetypes
@@ -127,12 +150,20 @@ namespace OxenteGames.JiraCommunication.Models
     internal sealed class JiraAllowedValue
     {
         public string id;
+        public string key;
         public string name;   // priority / version / component
         public string value;  // option / select
+        public string accountId;
+        public string displayName;
+        public string title;  // Atlassian Team and other rich option values
 
         public string Display =>
+            !string.IsNullOrWhiteSpace(displayName) ? displayName :
+            !string.IsNullOrWhiteSpace(title) ? title :
             !string.IsNullOrWhiteSpace(value) ? value :
-            !string.IsNullOrWhiteSpace(name) ? name : id;
+            !string.IsNullOrWhiteSpace(name) ? name :
+            !string.IsNullOrWhiteSpace(key) ? key :
+            !string.IsNullOrWhiteSpace(accountId) ? accountId : id;
     }
 
     [Serializable]
@@ -141,6 +172,7 @@ namespace OxenteGames.JiraCommunication.Models
         public bool required;
         public string name;
         public string fieldId;
+        public string description;
         public JiraFieldSchema schema;
         public JiraAllowedValue[] allowedValues;
 
@@ -150,7 +182,18 @@ namespace OxenteGames.JiraCommunication.Models
     [Serializable]
     internal sealed class JiraFieldMetaPage
     {
+        public JiraFieldMeta[] fields;
         public JiraFieldMeta[] values;
+        public int startAt;
+        public int maxResults;
+        public int total;
+        public bool isLast;
+    }
+
+    [Serializable]
+    internal sealed class JiraAllowedValuePage
+    {
+        public JiraAllowedValue[] values;
     }
 
     // Wrapper so JsonUtility can read the top-level array returned by

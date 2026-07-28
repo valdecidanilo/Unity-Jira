@@ -47,7 +47,7 @@ Informe:
 - E-mail: o e-mail da conta Atlassian
 - API Token: token pessoal criado na Atlassian
 
-Depois clique em **Testar e conectar**.
+Depois clique em **Conectar**.
 
 ## Segurança
 

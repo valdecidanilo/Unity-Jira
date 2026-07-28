@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Threading.Tasks;
 using OxenteGames.JiraCommunication.AI;
 using OxenteGames.JiraCommunication.API;
@@ -22,6 +24,29 @@ namespace OxenteGames.JiraCommunication
 
         private enum Tab { Connection, Create, Settings }
 
+        private sealed class AdditionalFieldBinding
+        {
+            public JiraFieldMeta Meta;
+            public TextField TextField;
+            public DropdownField Dropdown;
+            public Toggle BooleanToggle;
+            public readonly List<Toggle> OptionToggles = new List<Toggle>();
+        }
+
+        private sealed class QuickSubtaskBinding
+        {
+            public VisualElement Root;
+            public Label Header;
+            public TextField Title;
+            public TextField Description;
+        }
+
+        private sealed class QuickSubtaskInput
+        {
+            public string Title;
+            public string Description;
+        }
+
         // Connection tab
         private TextField _urlField;
         private TextField _emailField;
@@ -32,6 +57,7 @@ namespace OxenteGames.JiraCommunication
         private Label _connectedUserLabel;
         private Label _connectedEmailLabel;
         private bool _isConnecting;
+        private bool _isConnected;
 
         // Tabs
         private Button _connectionTab;
@@ -54,6 +80,11 @@ namespace OxenteGames.JiraCommunication
         private TextField _parentField;
         private TextField _summaryField;
         private TextField _descriptionField;
+        private VisualElement _quickSubtaskContainer;
+        private VisualElement _quickSubtasksList;
+        private readonly List<QuickSubtaskBinding> _quickSubtasks =
+            new List<QuickSubtaskBinding>();
+        private Label _fieldsStatusLabel;
         private Button _createButton;
         private Label _createStatus;
         private Button _openIssueButton;
@@ -65,15 +96,18 @@ namespace OxenteGames.JiraCommunication
         private VisualElement _datesContent;
         private DropdownField _priorityDropdown;
         private JiraFieldMeta _priorityMeta;
-        private DropdownField _teamDropdown;
-        private TextField _teamText;
-        private JiraFieldMeta _teamMeta;
+        private TextField _assigneeSearchField;
         private DropdownField _assigneeDropdown;
         private JiraFieldMeta _assigneeMeta;
         private TextField _startDateField;
         private JiraFieldMeta _startDateMeta;
         private TextField _dueDateField;
         private JiraFieldMeta _dueDateMeta;
+        private JiraFieldMeta _descriptionMeta;
+        private VisualElement _additionalFieldsCard;
+        private VisualElement _additionalFieldsContent;
+        private readonly List<AdditionalFieldBinding> _additionalFields =
+            new List<AdditionalFieldBinding>();
 
         // Attachment
         private string _attachmentPath = string.Empty;
@@ -82,6 +116,8 @@ namespace OxenteGames.JiraCommunication
         // AI assistant
         private TextField _aiPromptField;
         private Button _aiGenerateButton;
+        private VisualElement _aiInputContainer;
+        private Button _aiSetupButton;
         private bool _isAiBusy;
         private static readonly string[] ClaudeModelLabels = { "Claude Sonnet 5", "Claude Haiku 4.5", "Claude Opus 5" };
         private static readonly string[] ClaudeModelIds = { "claude-sonnet-5", "claude-haiku-4-5", "claude-opus-5" };
@@ -98,8 +134,13 @@ namespace OxenteGames.JiraCommunication
         private readonly List<JiraEpic> _epics = new List<JiraEpic>();
         private readonly List<JiraSprint> _sprints = new List<JiraSprint>();
         private readonly List<JiraUser> _assignableUsers = new List<JiraUser>();
+        private readonly List<JiraUser> _filteredAssignableUsers = new List<JiraUser>();
         private JiraUser _myself;
         private int _activeBoardId = -1;
+        private bool _epicsLoadFailed;
+        private bool _areFieldsLoading;
+        private bool _fieldsLoaded;
+        private int _fieldLoadVersion;
         private bool _isCreating;
         private bool _projectsLoaded;
 
@@ -145,7 +186,7 @@ namespace OxenteGames.JiraCommunication
             BuildTabBar();
 
             var scroll = new ScrollView(ScrollViewMode.Vertical);
-            scroll.style.flexGrow = 1;
+            JiraStyles.ApplyContentViewport(scroll);
             scroll.style.paddingLeft = 22;
             scroll.style.paddingRight = 22;
             scroll.style.paddingTop = 20;
@@ -168,15 +209,7 @@ namespace OxenteGames.JiraCommunication
         private void BuildBrandFooter()
         {
             var footer = new VisualElement();
-            footer.style.flexDirection = FlexDirection.Row;
-            footer.style.alignItems = Align.Center;
-            footer.style.paddingLeft = 22;
-            footer.style.paddingRight = 22;
-            footer.style.paddingTop = 8;
-            footer.style.paddingBottom = 8;
-            footer.style.backgroundColor = new StyleColor(new Color32(40, 44, 52, 255));
-            footer.style.borderTopWidth = 1;
-            footer.style.borderTopColor = new StyleColor(new Color32(67, 73, 84, 255));
+            JiraStyles.ApplyBrandFooter(footer);
 
             var brand = new Label("OxenteGames");
             brand.style.fontSize = 11;
@@ -259,6 +292,7 @@ namespace OxenteGames.JiraCommunication
             _connectionTab = new Button(() => SelectTab(Tab.Connection)) { text = L.Tr(L.K.TabConnection) };
             _createTab = new Button(() => SelectTab(Tab.Create)) { text = L.Tr(L.K.TabCreate) };
             _settingsTab = new Button(() => SelectTab(Tab.Settings)) { text = L.Tr(L.K.TabSettings) };
+            _createTab.style.display = DisplayStyle.None;
 
             bar.Add(_connectionTab);
             bar.Add(_createTab);
@@ -268,6 +302,9 @@ namespace OxenteGames.JiraCommunication
 
         private void SelectTab(Tab tab)
         {
+            if (tab == Tab.Create && !_isConnected)
+                tab = Tab.Connection;
+
             _activeTab = tab;
             if (_connectionPanel == null || _createPanel == null || _settingsPanel == null)
                 return;
@@ -401,11 +438,12 @@ namespace OxenteGames.JiraCommunication
 
             _createForm = new VisualElement();
             _createForm.Add(BuildDestinationCard());
-            _createForm.Add(BuildClassifyCard());
-            _createForm.Add(BuildDatesCard());
-            _createForm.Add(BuildAiCard());
             _createForm.Add(BuildDetailsCard());
+            _createForm.Add(BuildAiCard());
+            _createForm.Add(BuildAdditionalFieldsCard());
+            _createForm.Add(BuildClassifyCard());
             _createForm.Add(BuildAttachmentCard());
+            _createForm.Add(BuildDatesCard());
             _createForm.Add(BuildFooter());
             panel.Add(_createForm);
 
@@ -460,6 +498,12 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplyGhostButton(refreshButton);
             card.Add(refreshButton);
 
+            _fieldsStatusLabel = new Label();
+            JiraStyles.ApplyMuted(_fieldsStatusLabel);
+            _fieldsStatusLabel.style.marginTop = 8;
+            _fieldsStatusLabel.style.display = DisplayStyle.None;
+            card.Add(_fieldsStatusLabel);
+
             return card;
         }
 
@@ -495,6 +539,27 @@ namespace OxenteGames.JiraCommunication
             return _datesCard;
         }
 
+        private VisualElement BuildAdditionalFieldsCard()
+        {
+            _additionalFieldsCard = new VisualElement();
+            JiraStyles.ApplyCard(_additionalFieldsCard);
+
+            var title = new Label(L.Tr(L.K.CreateAdditionalFieldsTitle));
+            JiraStyles.ApplySectionTitle(title);
+            _additionalFieldsCard.Add(title);
+
+            var hint = new Label(L.Tr(L.K.AdditionalFieldsHint));
+            JiraStyles.ApplyMuted(hint);
+            hint.style.marginBottom = 12;
+            _additionalFieldsCard.Add(hint);
+
+            _additionalFieldsContent = new VisualElement();
+            _additionalFieldsCard.Add(_additionalFieldsContent);
+
+            _additionalFieldsCard.style.display = DisplayStyle.None;
+            return _additionalFieldsCard;
+        }
+
         private VisualElement BuildDetailsCard()
         {
             var card = new VisualElement();
@@ -504,7 +569,7 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplySectionTitle(title);
             card.Add(title);
 
-            _summaryField = new TextField(L.Tr(L.K.FieldSummary));
+            _summaryField = new TextField(L.Tr(L.K.FieldSummary) + " *");
             JiraStyles.ApplyField(_summaryField);
             card.Add(_summaryField);
 
@@ -512,7 +577,103 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplyMultiline(_descriptionField);
             card.Add(_descriptionField);
 
+            _quickSubtaskContainer = new VisualElement();
+
+            var quickSubtaskHeader = new VisualElement();
+            quickSubtaskHeader.style.flexDirection = FlexDirection.Row;
+            quickSubtaskHeader.style.alignItems = Align.Center;
+
+            var quickSubtaskTitle = new Label(L.Tr(L.K.FieldQuickSubtask));
+            JiraStyles.ApplyDynamicFieldLabel(quickSubtaskTitle);
+            quickSubtaskTitle.style.flexGrow = 1;
+            quickSubtaskHeader.Add(quickSubtaskTitle);
+
+            var addQuickSubtaskButton = new Button(AddQuickSubtask)
+            {
+                text = L.Tr(L.K.BtnAddQuickSubtask)
+            };
+            JiraStyles.ApplyCompactButton(addQuickSubtaskButton, false);
+            quickSubtaskHeader.Add(addQuickSubtaskButton);
+            _quickSubtaskContainer.Add(quickSubtaskHeader);
+
+            var quickSubtaskHint = new Label(L.Tr(L.K.QuickSubtaskHint));
+            JiraStyles.ApplyFieldHint(quickSubtaskHint);
+            _quickSubtaskContainer.Add(quickSubtaskHint);
+
+            _quickSubtasksList = new VisualElement();
+            _quickSubtaskContainer.Add(_quickSubtasksList);
+            AddQuickSubtask();
+
+            _quickSubtaskContainer.style.display = DisplayStyle.None;
+            card.Add(_quickSubtaskContainer);
+
             return card;
+        }
+
+        private void AddQuickSubtask()
+        {
+            if (_quickSubtasksList == null)
+                return;
+
+            var binding = new QuickSubtaskBinding
+            {
+                Root = new VisualElement(),
+                Header = new Label(),
+                Title = new TextField(L.Tr(L.K.FieldQuickSubtaskTitle)),
+                Description = new TextField(L.Tr(L.K.FieldQuickSubtaskDescription))
+            };
+            JiraStyles.ApplyNestedCard(binding.Root);
+
+            var headerRow = new VisualElement();
+            headerRow.style.flexDirection = FlexDirection.Row;
+            headerRow.style.alignItems = Align.Center;
+
+            JiraStyles.ApplyDynamicFieldLabel(binding.Header);
+            binding.Header.style.flexGrow = 1;
+            headerRow.Add(binding.Header);
+
+            var removeButton = new Button(() => RemoveQuickSubtask(binding))
+            {
+                text = "−",
+                tooltip = L.Tr(L.K.BtnRemoveQuickSubtask)
+            };
+            JiraStyles.ApplyCompactButton(removeButton, true);
+            headerRow.Add(removeButton);
+            binding.Root.Add(headerRow);
+
+            JiraStyles.ApplyField(binding.Title);
+            binding.Root.Add(binding.Title);
+
+            JiraStyles.ApplyMultiline(binding.Description);
+            binding.Description.style.minHeight = 64;
+            binding.Root.Add(binding.Description);
+
+            _quickSubtasks.Add(binding);
+            _quickSubtasksList.Add(binding.Root);
+            RefreshQuickSubtaskHeaders();
+        }
+
+        private void RemoveQuickSubtask(QuickSubtaskBinding binding)
+        {
+            if (binding == null || !_quickSubtasks.Remove(binding))
+                return;
+
+            binding.Root?.RemoveFromHierarchy();
+            RefreshQuickSubtaskHeaders();
+        }
+
+        private void RefreshQuickSubtaskHeaders()
+        {
+            for (int i = 0; i < _quickSubtasks.Count; i++)
+                _quickSubtasks[i].Header.text =
+                    L.Tr(L.K.QuickSubtaskNumber, i + 1);
+        }
+
+        private void ResetQuickSubtasks()
+        {
+            _quickSubtasks.Clear();
+            _quickSubtasksList?.Clear();
+            AddQuickSubtask();
         }
 
         private VisualElement BuildAttachmentCard()
@@ -533,6 +694,14 @@ namespace OxenteGames.JiraCommunication
             selectButton.style.marginRight = 8;
             row.Add(selectButton);
 
+            var screenshotButton = new Button(CaptureGameViewAttachment)
+            {
+                text = L.Tr(L.K.BtnCaptureGameView)
+            };
+            JiraStyles.ApplyGhostButton(screenshotButton);
+            screenshotButton.style.marginRight = 8;
+            row.Add(screenshotButton);
+
             var removeButton = new Button(ClearAttachment) { text = L.Tr(L.K.BtnRemoveFile) };
             JiraStyles.ApplyGhostButton(removeButton);
             row.Add(removeButton);
@@ -543,6 +712,10 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplyFieldHint(_attachmentLabel);
             _attachmentLabel.style.marginTop = 8;
             card.Add(_attachmentLabel);
+
+            var screenshotHint = new Label(L.Tr(L.K.CaptureGameViewHint));
+            JiraStyles.ApplyFieldHint(screenshotHint);
+            card.Add(screenshotHint);
 
             return card;
         }
@@ -556,16 +729,48 @@ namespace OxenteGames.JiraCommunication
             JiraStyles.ApplySectionTitle(title);
             card.Add(title);
 
+            _aiInputContainer = new VisualElement();
             _aiPromptField = new TextField(L.Tr(L.K.AiPromptLabel));
             JiraStyles.ApplyMultiline(_aiPromptField);
             _aiPromptField.style.minHeight = 56;
-            card.Add(_aiPromptField);
+            _aiInputContainer.Add(_aiPromptField);
 
             _aiGenerateButton = new Button(GenerateWithAiAsync) { text = L.Tr(L.K.BtnAiGenerate) };
             JiraStyles.ApplySecondaryButton(_aiGenerateButton);
-            card.Add(_aiGenerateButton);
+            _aiInputContainer.Add(_aiGenerateButton);
+            card.Add(_aiInputContainer);
+
+            _aiSetupButton = new Button(() => SelectTab(Tab.Settings))
+            {
+                text = L.Tr(L.K.BtnConfigureAi)
+            };
+            JiraStyles.ApplySecondaryButton(_aiSetupButton);
+            card.Add(_aiSetupButton);
+
+            RefreshAiAvailability();
 
             return card;
+        }
+
+        private void RefreshAiAvailability()
+        {
+            if (_aiInputContainer == null || _aiSetupButton == null)
+                return;
+
+            bool configured = HasAiConfiguration();
+            _aiInputContainer.style.display = configured
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            _aiSetupButton.style.display = configured
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
+        }
+
+        private static bool HasAiConfiguration()
+        {
+            string provider = JiraPreferences.AiProvider;
+            return !string.IsNullOrWhiteSpace(JiraPreferences.GetAiToken(provider)) &&
+                   !string.IsNullOrWhiteSpace(JiraPreferences.GetAiModel(provider));
         }
 
         private async void GenerateWithAiAsync()
@@ -693,12 +898,15 @@ namespace OxenteGames.JiraCommunication
 
         private void RefreshCreateAvailability()
         {
-            bool connected = HasCredentials();
+            bool connected = _isConnected;
             _createNotice.style.display = connected ? DisplayStyle.None : DisplayStyle.Flex;
             _createForm.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
 
             if (connected && !_projectsLoaded)
                 ReloadProjectsAsync();
+
+            if (connected)
+                RefreshAiAvailability();
         }
 
         // --- Attachment -----------------------------------------------------
@@ -711,6 +919,69 @@ namespace OxenteGames.JiraCommunication
 
             _attachmentPath = path;
             _attachmentLabel.text = System.IO.Path.GetFileName(path);
+        }
+
+        private void CaptureGameViewAttachment()
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+#if UNITY_2022_2_OR_NEWER
+                camera = UnityEngine.Object.FindFirstObjectByType<Camera>();
+#else
+                camera = UnityEngine.Object.FindObjectOfType<Camera>();
+#endif
+            }
+            if (camera == null)
+            {
+                _attachmentLabel.text = L.Tr(L.K.MsgNoCameraForScreenshot);
+                return;
+            }
+
+            int width = Mathf.Clamp(camera.pixelWidth, 640, 3840);
+            int height = Mathf.Clamp(camera.pixelHeight, 360, 2160);
+            RenderTexture previousTarget = camera.targetTexture;
+            RenderTexture previousActive = RenderTexture.active;
+            RenderTexture renderTexture = null;
+            Texture2D screenshot = null;
+
+            try
+            {
+                renderTexture = RenderTexture.GetTemporary(
+                    width,
+                    height,
+                    24,
+                    RenderTextureFormat.ARGB32);
+                camera.targetTexture = renderTexture;
+                camera.Render();
+                RenderTexture.active = renderTexture;
+
+                screenshot = new Texture2D(width, height, TextureFormat.RGB24, false);
+                screenshot.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                screenshot.Apply();
+
+                string fileName =
+                    $"jira-gameview-{DateTime.Now:yyyyMMdd-HHmmss}.png";
+                string path = Path.Combine(Application.temporaryCachePath, fileName);
+                File.WriteAllBytes(path, screenshot.EncodeToPNG());
+
+                _attachmentPath = path;
+                _attachmentLabel.text = L.Tr(L.K.MsgScreenshotCaptured, fileName);
+            }
+            catch (Exception exception)
+            {
+                _attachmentLabel.text =
+                    L.Tr(L.K.MsgScreenshotFailed, exception.Message);
+            }
+            finally
+            {
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                if (renderTexture != null)
+                    RenderTexture.ReleaseTemporary(renderTexture);
+                if (screenshot != null)
+                    DestroyImmediate(screenshot);
+            }
         }
 
         private void ClearAttachment()
@@ -813,7 +1084,11 @@ namespace OxenteGames.JiraCommunication
                 isPasswordField = true
             };
             JiraStyles.ApplyField(tokenField);
-            tokenField.RegisterValueChangedCallback(evt => JiraPreferences.SetAiToken(provider, evt.newValue));
+            tokenField.RegisterValueChangedCallback(evt =>
+            {
+                JiraPreferences.SetAiToken(provider, evt.newValue);
+                RefreshAiAvailability();
+            });
             card.Add(tokenField);
 
             string[] modelLabels = isOpenAi ? OpenAiModelLabels : ClaudeModelLabels;
@@ -859,8 +1134,10 @@ namespace OxenteGames.JiraCommunication
             if (_emailField != null) _emailField.value = string.Empty;
             if (_tokenField != null) _tokenField.value = string.Empty;
             if (_connectedCard != null) _connectedCard.style.display = DisplayStyle.None;
+            SetConnectionAvailability(false);
 
             ShowStatus(L.Tr(L.K.MsgDataCleared), true);
+            SelectTab(Tab.Connection);
         }
 
         // --- Data loading ---------------------------------------------------
@@ -927,15 +1204,20 @@ namespace OxenteGames.JiraCommunication
                 _issueTypes.AddRange(types);
 
                 var typeLabels = new List<string>(_issueTypes.Count);
-                int presetIndex = 0;
+                int presetIndex = FindDefaultIssueTypeIndex(_issueTypes);
                 string presetType = JiraPreferences.PresetIssueTypeName;
                 for (int i = 0; i < _issueTypes.Count; i++)
                 {
                     JiraIssueType type = _issueTypes[i];
                     typeLabels.Add(type.subtask ? $"{type.name} (subtask)" : type.name);
-                    if (!string.IsNullOrEmpty(presetType) && type.name == presetType)
+                    if (presetIndex < 0 &&
+                        !string.IsNullOrEmpty(presetType) &&
+                        type.name == presetType)
                         presetIndex = i;
                 }
+
+                if (presetIndex < 0)
+                    presetIndex = 0;
 
                 _typeDropdown.choices = typeLabels;
                 _typeDropdown.SetValueWithoutNotify(typeLabels.Count > 0 ? typeLabels[presetIndex] : string.Empty);
@@ -967,11 +1249,78 @@ namespace OxenteGames.JiraCommunication
             OnTypeSelected();
         }
 
+        private static int FindDefaultIssueTypeIndex(List<JiraIssueType> issueTypes)
+        {
+            for (int i = 0; i < issueTypes.Count; i++)
+            {
+                JiraIssueType issueType = issueTypes[i];
+                if (IsStoryIssueType(issueType))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private void UpdateQuickSubtaskVisibility(JiraIssueType issueType)
+        {
+            if (_quickSubtaskContainer == null)
+                return;
+
+            bool canCreate = IsStoryIssueType(issueType) &&
+                             FindQuickSubtaskType() != null;
+            _quickSubtaskContainer.style.display = canCreate
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        }
+
+        private static bool IsStoryIssueType(JiraIssueType issueType)
+        {
+            if (issueType == null || issueType.subtask)
+                return false;
+
+            string name = issueType.name?.Trim();
+            return string.Equals(name, "História", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(name, "Historia", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(name, "Story", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(name, "User Story", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private JiraIssueType FindQuickSubtaskType()
+        {
+            JiraIssueType fallback = null;
+            foreach (JiraIssueType issueType in _issueTypes)
+            {
+                if (issueType == null || !issueType.subtask)
+                    continue;
+
+                if (fallback == null)
+                    fallback = issueType;
+
+                string name = issueType.name?.Trim();
+                if (string.Equals(name, "Subtarefa", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, "Sub-task", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, "Subtask", StringComparison.OrdinalIgnoreCase))
+                    return issueType;
+            }
+
+            return fallback;
+        }
+
         private async Task LoadBoardDataAsync(JiraClient client, string projectKey)
         {
             _activeBoardId = -1;
+            _epicsLoadFailed = false;
             _epics.Clear();
             _sprints.Clear();
+
+            try
+            {
+                _epics.AddRange(await client.GetProjectEpicsAsync(projectKey));
+            }
+            catch
+            {
+                _epicsLoadFailed = true;
+            }
 
             try
             {
@@ -983,7 +1332,6 @@ namespace OxenteGames.JiraCommunication
 
             if (_activeBoardId > 0)
             {
-                try { _epics.AddRange(await client.GetEpicsAsync(_activeBoardId)); } catch { }
                 try { _sprints.AddRange(await client.GetActiveSprintsAsync(_activeBoardId)); } catch { }
             }
 
@@ -993,12 +1341,26 @@ namespace OxenteGames.JiraCommunication
 
         private void PopulateEpicChoices()
         {
-            var labels = new List<string> { L.Tr(L.K.NoneOption) };
-            foreach (JiraEpic epic in _epics)
-                labels.Add($"{epic.DisplayName} ({epic.key})");
+            var labels = new List<string>();
+
+            if (_epicsLoadFailed)
+            {
+                labels.Add(L.Tr(L.K.MsgEpicsFailedOption));
+            }
+            else if (_epics.Count == 0)
+            {
+                labels.Add(L.Tr(L.K.MsgNoEpicsOption));
+            }
+            else
+            {
+                labels.Add(L.Tr(L.K.NoneOption));
+                foreach (JiraEpic epic in _epics)
+                    labels.Add($"{epic.DisplayName} ({epic.key})");
+            }
 
             _epicDropdown.choices = labels;
             _epicDropdown.SetValueWithoutNotify(labels[0]);
+            _epicDropdown.SetEnabled(!_epicsLoadFailed && _epics.Count > 0);
 
             if (_epicProgressContainer != null)
                 _epicProgressContainer.style.display = DisplayStyle.None;
@@ -1095,23 +1457,97 @@ namespace OxenteGames.JiraCommunication
 
             _parentContainer.style.display = isSubtask ? DisplayStyle.Flex : DisplayStyle.None;
             _epicContainer.style.display = isSubtask ? DisplayStyle.None : DisplayStyle.Flex;
+            UpdateQuickSubtaskVisibility(type);
+            _parentField.label = isSubtask
+                ? L.Tr(L.K.FieldParent) + " *"
+                : L.Tr(L.K.FieldParent);
 
             JiraProject project = SelectedProject();
             if (project == null || type == null)
             {
+                _fieldLoadVersion++;
+                _fieldsLoaded = false;
+                SetFieldsLoading(false);
                 ClearDynamicFields();
+                _fieldsStatusLabel.style.display = DisplayStyle.None;
                 return;
             }
 
             JiraClient client = BuildClientOrNull();
             if (client == null)
+            {
+                _fieldsLoaded = false;
                 return;
+            }
 
-            List<JiraFieldMeta> fields;
-            try { fields = await client.GetCreateFieldsAsync(project.key, type.id); }
-            catch { fields = new List<JiraFieldMeta>(); }
+            int loadVersion = ++_fieldLoadVersion;
+            string projectKey = project.key;
+            string issueTypeId = type.id;
 
-            RebuildDynamicFields(fields);
+            _fieldsLoaded = false;
+            ClearDynamicFields();
+            SetFieldsLoading(true);
+            ShowFieldsStatus(L.Tr(L.K.MsgLoadingFields), true);
+
+            try
+            {
+                List<JiraFieldMeta> fields =
+                    await client.GetCreateFieldsAsync(projectKey, issueTypeId);
+
+                if (loadVersion != _fieldLoadVersion ||
+                    SelectedProject()?.key != projectKey ||
+                    SelectedIssueType()?.id != issueTypeId)
+                    return;
+
+                if (fields.Count == 0)
+                {
+                    ShowFieldsStatus(L.Tr(L.K.MsgNoFieldsReturned), false);
+                    return;
+                }
+
+                JiraFieldMeta priorityMeta = FindById(fields, FieldPriority);
+                if (priorityMeta != null && !priorityMeta.HasAllowedValues)
+                {
+                    List<JiraAllowedValue> priorities =
+                        await client.GetPrioritiesAsync();
+
+                    if (loadVersion != _fieldLoadVersion)
+                        return;
+
+                    if (priorities.Count > 0)
+                        priorityMeta.allowedValues = priorities.ToArray();
+                }
+
+                RebuildDynamicFields(fields);
+                _fieldsLoaded = true;
+                ShowFieldsStatus(L.Tr(L.K.MsgFieldsLoaded, fields.Count), true);
+            }
+            catch (Exception exception)
+            {
+                if (loadVersion == _fieldLoadVersion)
+                    ShowFieldsStatus(
+                        L.Tr(L.K.MsgFieldsLoadFailed, exception.Message),
+                        false);
+            }
+            finally
+            {
+                if (loadVersion == _fieldLoadVersion)
+                    SetFieldsLoading(false);
+            }
+        }
+
+        private void SetFieldsLoading(bool loading)
+        {
+            _areFieldsLoading = loading;
+            if (_createButton != null)
+                _createButton.SetEnabled(!_isCreating && !_areFieldsLoading);
+        }
+
+        private void ShowFieldsStatus(string message, bool success)
+        {
+            _fieldsStatusLabel.text = message;
+            _fieldsStatusLabel.style.display = DisplayStyle.Flex;
+            JiraStyles.ApplyInlineStatus(_fieldsStatusLabel, success);
         }
 
         // --- Dynamic fields -------------------------------------------------
@@ -1119,59 +1555,58 @@ namespace OxenteGames.JiraCommunication
         private void ClearDynamicFields()
         {
             _priorityDropdown = null; _priorityMeta = null;
-            _teamDropdown = null; _teamText = null; _teamMeta = null;
-            _assigneeDropdown = null; _assigneeMeta = null;
+            _assigneeSearchField = null; _assigneeDropdown = null; _assigneeMeta = null;
+            _filteredAssignableUsers.Clear();
             _startDateField = null; _startDateMeta = null;
             _dueDateField = null; _dueDateMeta = null;
+            _descriptionMeta = null;
+            _descriptionField.label = L.Tr(L.K.FieldDescription);
+            _additionalFields.Clear();
 
             _classifyContent.Clear();
             _datesContent.Clear();
+            _additionalFieldsContent.Clear();
             _classifyCard.style.display = DisplayStyle.None;
             _datesCard.style.display = DisplayStyle.None;
+            _additionalFieldsCard.style.display = DisplayStyle.None;
         }
 
         private void RebuildDynamicFields(List<JiraFieldMeta> fields)
         {
             ClearDynamicFields();
+            var specializedFields = new HashSet<string>();
+
+            _descriptionMeta = FindById(fields, "description");
+            _descriptionField.label = FieldLabel(
+                _descriptionMeta,
+                L.Tr(L.K.FieldDescription));
 
             // Priority
             _priorityMeta = FindById(fields, FieldPriority);
             VisualElement priorityWidget = null;
             if (_priorityMeta != null && _priorityMeta.HasAllowedValues)
             {
-                _priorityDropdown = BuildAllowedDropdown(L.Tr(L.K.FieldPriority), _priorityMeta, JiraPreferences.PresetPriorityId, preferMedium: true);
+                _priorityDropdown = BuildAllowedDropdown(
+                    FieldLabel(_priorityMeta, L.Tr(L.K.FieldPriority)),
+                    _priorityMeta,
+                    JiraPreferences.PresetPriorityId,
+                    preferMedium: true);
                 priorityWidget = _priorityDropdown;
+                specializedFields.Add(_priorityMeta.fieldId);
             }
 
-            // Team (discovered by name)
-            _teamMeta = FindTeam(fields);
-            VisualElement teamWidget = null;
-            if (_teamMeta != null)
-            {
-                if (_teamMeta.HasAllowedValues)
-                {
-                    _teamDropdown = BuildAllowedDropdown(L.Tr(L.K.FieldTeam), _teamMeta, JiraPreferences.PresetTeamValue, preferMedium: false);
-                    teamWidget = _teamDropdown;
-                }
-                else
-                {
-                    _teamText = new TextField(L.Tr(L.K.FieldTeam)) { value = JiraPreferences.PresetTeamValue };
-                    JiraStyles.ApplyField(_teamText);
-                    teamWidget = _teamText;
-                }
-            }
-
-            if (priorityWidget != null && teamWidget != null)
-                _classifyContent.Add(JiraStyles.Row(priorityWidget, teamWidget));
-            else if (priorityWidget != null)
+            if (priorityWidget != null)
                 _classifyContent.Add(priorityWidget);
-            else if (teamWidget != null)
-                _classifyContent.Add(teamWidget);
 
             // Assignee
             _assigneeMeta = FindById(fields, FieldAssignee);
             if (_assigneeMeta != null)
-                _classifyContent.Add(BuildAssigneeWidget(JiraPreferences.PresetAssigneeAccountId));
+            {
+                _classifyContent.Add(BuildAssigneeWidget(
+                    FieldLabel(_assigneeMeta, L.Tr(L.K.FieldAssignee)),
+                    JiraPreferences.PresetAssigneeAccountId));
+                specializedFields.Add(_assigneeMeta.fieldId);
+            }
 
             _classifyCard.style.display = _classifyContent.childCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
@@ -1179,8 +1614,21 @@ namespace OxenteGames.JiraCommunication
             _startDateMeta = FindStartDate(fields);
             _dueDateMeta = FindById(fields, FieldDueDate);
 
-            VisualElement startWidget = _startDateMeta != null ? BuildDateWidget(L.Tr(L.K.FieldStartDate), out _startDateField) : null;
-            VisualElement dueWidget = _dueDateMeta != null ? BuildDateWidget(L.Tr(L.K.FieldDueDate), out _dueDateField) : null;
+            VisualElement startWidget = _startDateMeta != null
+                ? BuildDateWidget(
+                    FieldLabel(_startDateMeta, L.Tr(L.K.FieldStartDate)),
+                    out _startDateField)
+                : null;
+            VisualElement dueWidget = _dueDateMeta != null
+                ? BuildDateWidget(
+                    FieldLabel(_dueDateMeta, L.Tr(L.K.FieldDueDate)),
+                    out _dueDateField)
+                : null;
+
+            if (_startDateMeta != null)
+                specializedFields.Add(_startDateMeta.fieldId);
+            if (_dueDateMeta != null)
+                specializedFields.Add(_dueDateMeta.fieldId);
 
             if (startWidget != null && dueWidget != null)
                 _datesContent.Add(JiraStyles.Row(startWidget, dueWidget));
@@ -1190,6 +1638,30 @@ namespace OxenteGames.JiraCommunication
                 _datesContent.Add(dueWidget);
 
             _datesCard.style.display = _datesContent.childCount > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
+            AddAdditionalFields(fields, specializedFields, required: true);
+            AddAdditionalFields(fields, specializedFields, required: false);
+
+            _additionalFieldsCard.style.display = _additionalFieldsContent.childCount > 0
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        }
+
+        private void AddAdditionalFields(
+            List<JiraFieldMeta> fields,
+            HashSet<string> specializedFields,
+            bool required)
+        {
+            foreach (JiraFieldMeta field in fields)
+            {
+                if (field == null || string.IsNullOrWhiteSpace(field.fieldId) ||
+                    field.required != required ||
+                    IsCoreField(field.fieldId) ||
+                    specializedFields.Contains(field.fieldId))
+                    continue;
+
+                _additionalFields.Add(BuildAdditionalField(field));
+            }
         }
 
         private static DropdownField BuildAllowedDropdown(string label, JiraFieldMeta meta, string presetId, bool preferMedium)
@@ -1221,27 +1693,26 @@ namespace OxenteGames.JiraCommunication
             return dropdown;
         }
 
-        private VisualElement BuildAssigneeWidget(string presetAccountId)
+        private VisualElement BuildAssigneeWidget(string label, string presetAccountId)
         {
             var container = new VisualElement();
 
             EnsureMyselfInAssignable();
 
-            _assigneeDropdown = new DropdownField(L.Tr(L.K.FieldAssignee));
-            var labels = new List<string> { L.Tr(L.K.AssigneeNone) };
-            int selected = 0;
-            for (int i = 0; i < _assignableUsers.Count; i++)
-            {
-                JiraUser user = _assignableUsers[i];
-                labels.Add(!string.IsNullOrWhiteSpace(user.displayName) ? user.displayName : user.accountId);
-                if (!string.IsNullOrEmpty(presetAccountId) && user.accountId == presetAccountId)
-                    selected = i + 1;
-            }
+            _assigneeSearchField = new TextField(L.Tr(L.K.FieldAssigneeSearch));
+            JiraStyles.ApplyField(_assigneeSearchField);
+            container.Add(_assigneeSearchField);
 
-            _assigneeDropdown.choices = labels;
-            _assigneeDropdown.SetValueWithoutNotify(labels[selected]);
+            _assigneeDropdown = new DropdownField(label);
             JiraStyles.ApplyDropdown(_assigneeDropdown);
             container.Add(_assigneeDropdown);
+
+            RefreshAssigneeChoices(string.Empty, presetAccountId);
+            _assigneeSearchField.RegisterValueChangedCallback(evt =>
+            {
+                string selectedAccountId = SelectedAssigneeAccountId();
+                RefreshAssigneeChoices(evt.newValue, selectedAccountId);
+            });
 
             var selfButton = new Button(AssignToSelf) { text = L.Tr(L.K.BtnAssignSelf) };
             JiraStyles.ApplyGhostButton(selfButton);
@@ -1249,6 +1720,186 @@ namespace OxenteGames.JiraCommunication
             container.Add(selfButton);
 
             return container;
+        }
+
+        private void RefreshAssigneeChoices(string query, string preferredAccountId)
+        {
+            if (_assigneeDropdown == null)
+                return;
+
+            _filteredAssignableUsers.Clear();
+            string normalizedQuery = query?.Trim();
+
+            foreach (JiraUser user in _assignableUsers)
+            {
+                if (user == null || !MatchesAssignee(user, normalizedQuery))
+                    continue;
+
+                _filteredAssignableUsers.Add(user);
+                if (_filteredAssignableUsers.Count >= 100)
+                    break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(preferredAccountId) &&
+                !_filteredAssignableUsers.Exists(
+                    user => user.accountId == preferredAccountId))
+            {
+                JiraUser preferred = _assignableUsers.Find(
+                    user => user != null && user.accountId == preferredAccountId);
+                if (preferred != null)
+                {
+                    if (_filteredAssignableUsers.Count >= 100)
+                        _filteredAssignableUsers.RemoveAt(
+                            _filteredAssignableUsers.Count - 1);
+                    _filteredAssignableUsers.Add(preferred);
+                }
+            }
+
+            var labels = new List<string> { L.Tr(L.K.AssigneeNone) };
+            int selected = 0;
+            for (int i = 0; i < _filteredAssignableUsers.Count; i++)
+            {
+                JiraUser user = _filteredAssignableUsers[i];
+                labels.Add(AssigneeDisplay(user));
+                if (!string.IsNullOrWhiteSpace(preferredAccountId) &&
+                    user.accountId == preferredAccountId)
+                    selected = i + 1;
+            }
+
+            _assigneeDropdown.choices = labels;
+            _assigneeDropdown.SetValueWithoutNotify(labels[selected]);
+        }
+
+        private static bool MatchesAssignee(JiraUser user, string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return true;
+
+            return ContainsIgnoreCase(user.displayName, query) ||
+                   ContainsIgnoreCase(user.emailAddress, query) ||
+                   ContainsIgnoreCase(user.accountId, query);
+        }
+
+        private static bool ContainsIgnoreCase(string text, string value)
+        {
+            return !string.IsNullOrWhiteSpace(text) &&
+                   text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string AssigneeDisplay(JiraUser user)
+        {
+            string name = !string.IsNullOrWhiteSpace(user?.displayName)
+                ? user.displayName
+                : user?.accountId;
+            return !string.IsNullOrWhiteSpace(user?.emailAddress)
+                ? $"{name} — {user.emailAddress}"
+                : name;
+        }
+
+        private string SelectedAssigneeAccountId()
+        {
+            if (_assigneeDropdown == null || _assigneeDropdown.index <= 0)
+                return null;
+
+            int userIndex = _assigneeDropdown.index - 1;
+            return userIndex >= 0 && userIndex < _filteredAssignableUsers.Count
+                ? _filteredAssignableUsers[userIndex].accountId
+                : null;
+        }
+
+        private AdditionalFieldBinding BuildAdditionalField(JiraFieldMeta meta)
+        {
+            var binding = new AdditionalFieldBinding { Meta = meta };
+            string label = FieldLabel(meta, meta.fieldId);
+            string type = meta.schema?.type ?? "string";
+
+            if (meta.HasAllowedValues && type == "array")
+            {
+                var labelElement = new Label(label);
+                JiraStyles.ApplyDynamicFieldLabel(labelElement);
+                _additionalFieldsContent.Add(labelElement);
+
+                var options = new VisualElement();
+                JiraStyles.ApplyDynamicOptions(options);
+                foreach (JiraAllowedValue allowedValue in meta.allowedValues)
+                {
+                    var toggle = new Toggle(allowedValue.Display)
+                    {
+                        userData = allowedValue
+                    };
+                    binding.OptionToggles.Add(toggle);
+                    options.Add(toggle);
+                }
+                _additionalFieldsContent.Add(options);
+            }
+            else if (meta.HasAllowedValues)
+            {
+                binding.Dropdown = BuildAdditionalDropdown(label, meta);
+                _additionalFieldsContent.Add(binding.Dropdown);
+            }
+            else if (type == "boolean")
+            {
+                binding.BooleanToggle = new Toggle(label);
+                binding.BooleanToggle.style.marginBottom = 10;
+                _additionalFieldsContent.Add(binding.BooleanToggle);
+            }
+            else
+            {
+                binding.TextField = new TextField(label);
+                if (IsMultilineField(meta))
+                    JiraStyles.ApplyMultiline(binding.TextField);
+                else
+                    JiraStyles.ApplyField(binding.TextField);
+                _additionalFieldsContent.Add(binding.TextField);
+
+                if (type == "date" || type == "datetime")
+                {
+                    var dateHint = new Label(L.Tr(L.K.DateHint));
+                    JiraStyles.ApplyFieldHint(dateHint);
+                    _additionalFieldsContent.Add(dateHint);
+                }
+                else if (type == "array")
+                {
+                    var arrayHint = new Label(L.Tr(L.K.ArrayFieldHint));
+                    JiraStyles.ApplyFieldHint(arrayHint);
+                    _additionalFieldsContent.Add(arrayHint);
+                }
+                else if (IsAtlassianTeamField(meta))
+                {
+                    var teamHint = new Label(L.Tr(L.K.TeamIdHint));
+                    JiraStyles.ApplyFieldHint(teamHint);
+                    _additionalFieldsContent.Add(teamHint);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(meta.description))
+            {
+                var description = new Label(meta.description);
+                JiraStyles.ApplyFieldHint(description);
+                _additionalFieldsContent.Add(description);
+            }
+
+            return binding;
+        }
+
+        private static DropdownField BuildAdditionalDropdown(
+            string label,
+            JiraFieldMeta meta)
+        {
+            var dropdown = new DropdownField(label);
+            var labels = new List<string>();
+
+            if (!meta.required)
+                labels.Add(L.Tr(L.K.NoneOption));
+
+            foreach (JiraAllowedValue allowedValue in meta.allowedValues)
+                labels.Add(allowedValue.Display);
+
+            dropdown.choices = labels;
+            if (labels.Count > 0)
+                dropdown.SetValueWithoutNotify(labels[0]);
+            JiraStyles.ApplyDropdown(dropdown);
+            return dropdown;
         }
 
         private void EnsureMyselfInAssignable()
@@ -1266,7 +1917,10 @@ namespace OxenteGames.JiraCommunication
             if (_assigneeDropdown == null || _myself == null)
                 return;
 
-            int index = _assignableUsers.FindIndex(u => u.accountId == _myself.accountId);
+            _assigneeSearchField?.SetValueWithoutNotify(_myself.displayName ?? string.Empty);
+            RefreshAssigneeChoices(_myself.displayName, _myself.accountId);
+            int index = _filteredAssignableUsers.FindIndex(
+                u => u.accountId == _myself.accountId);
             if (index >= 0)
                 _assigneeDropdown.index = index + 1; // +1 for the "None" entry
         }
@@ -1291,21 +1945,6 @@ namespace OxenteGames.JiraCommunication
             return null;
         }
 
-        private static JiraFieldMeta FindTeam(List<JiraFieldMeta> fields)
-        {
-            foreach (JiraFieldMeta field in fields)
-            {
-                if (field?.name == null || field.fieldId == "assignee" || field.fieldId == "reporter")
-                    continue;
-
-                string n = field.name.Trim().ToLowerInvariant();
-                if (n == "time" || n == "team" || n == "equipe" || n == "squad" ||
-                    n == "times" || n.Contains("equipe") || n.Contains("squad"))
-                    return field;
-            }
-            return null;
-        }
-
         private static JiraFieldMeta FindStartDate(List<JiraFieldMeta> fields)
         {
             foreach (JiraFieldMeta field in fields)
@@ -1324,6 +1963,57 @@ namespace OxenteGames.JiraCommunication
             return null;
         }
 
+        private static bool IsCoreField(string fieldId)
+        {
+            return fieldId == "project" ||
+                   fieldId == "issuetype" ||
+                   fieldId == "summary" ||
+                   fieldId == "description" ||
+                   fieldId == "parent" ||
+                   fieldId == "attachment";
+        }
+
+        private static string FieldLabel(JiraFieldMeta meta, string fallback)
+        {
+            string label = !string.IsNullOrWhiteSpace(meta?.name) ? meta.name : fallback;
+            return meta != null && meta.required ? label + " *" : label;
+        }
+
+        private bool TryCollectQuickSubtasks(
+            JiraIssueType issueType,
+            out List<QuickSubtaskInput> inputs,
+            out string error)
+        {
+            inputs = new List<QuickSubtaskInput>();
+            error = null;
+
+            if (!IsStoryIssueType(issueType))
+                return true;
+
+            foreach (QuickSubtaskBinding binding in _quickSubtasks)
+            {
+                string title = binding.Title?.value?.Trim();
+                string description = binding.Description?.value?.Trim();
+                if (string.IsNullOrWhiteSpace(title) &&
+                    string.IsNullOrWhiteSpace(description))
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    error = L.Tr(L.K.MsgQuickSubtaskTitleRequired);
+                    return false;
+                }
+
+                inputs.Add(new QuickSubtaskInput
+                {
+                    Title = title,
+                    Description = description
+                });
+            }
+
+            return true;
+        }
+
         // --- Create ---------------------------------------------------------
 
         private async void CreateIssueAsync()
@@ -1337,7 +2027,21 @@ namespace OxenteGames.JiraCommunication
 
             if (project == null) { SetCreateStatus(L.Tr(L.K.MsgSelectProject), false); return; }
             if (type == null) { SetCreateStatus(L.Tr(L.K.MsgSelectType), false); return; }
+            if (!_fieldsLoaded) { SetCreateStatus(L.Tr(L.K.MsgFieldsNotLoaded), false); return; }
             if (string.IsNullOrWhiteSpace(summary)) { SetCreateStatus(L.Tr(L.K.MsgSummaryRequired), false); return; }
+            if (!ValidateDynamicFields(out string fieldError))
+            {
+                SetCreateStatus(fieldError, false);
+                return;
+            }
+            if (!TryCollectQuickSubtasks(
+                    type,
+                    out List<QuickSubtaskInput> quickSubtasks,
+                    out string quickSubtaskError))
+            {
+                SetCreateStatus(quickSubtaskError, false);
+                return;
+            }
 
             var draft = new JiraIssueDraft
             {
@@ -1385,6 +2089,33 @@ namespace OxenteGames.JiraCommunication
                 SavePresets(project, type);
                 string message = L.Tr(L.K.MsgIssueCreated, result.IssueKey);
 
+                JiraIssueType quickSubtaskType = FindQuickSubtaskType();
+                if (IsStoryIssueType(type) && quickSubtaskType != null)
+                {
+                    foreach (QuickSubtaskInput quickSubtask in quickSubtasks)
+                    {
+                        var subtaskDraft = new JiraIssueDraft
+                        {
+                            ProjectKey = project.key,
+                            IssueTypeId = quickSubtaskType.id,
+                            ParentKey = result.IssueKey,
+                            Summary = quickSubtask.Title,
+                            Description = quickSubtask.Description
+                        };
+
+                        JiraCreateIssueResult subtaskResult =
+                            await client.CreateIssueAsync(subtaskDraft);
+                        message += subtaskResult.Success
+                            ? L.Tr(
+                                L.K.MsgQuickSubtaskCreated,
+                                subtaskResult.IssueKey)
+                            : L.Tr(
+                                L.K.MsgQuickSubtaskFailed,
+                                quickSubtask.Title,
+                                subtaskResult.Message);
+                    }
+                }
+
                 JiraSprint sprint = SelectedSprint();
                 if (sprint != null && !type.subtask)
                 {
@@ -1407,6 +2138,7 @@ namespace OxenteGames.JiraCommunication
 
                 _summaryField.value = string.Empty;
                 _descriptionField.value = string.Empty;
+                ResetQuickSubtasks();
                 ClearAttachment();
             }
             catch (Exception exception)
@@ -1424,34 +2156,17 @@ namespace OxenteGames.JiraCommunication
             if (_priorityMeta != null && _priorityDropdown != null)
             {
                 JiraAllowedValue value = AllowedAt(_priorityMeta, _priorityDropdown.index);
-                if (value != null && !string.IsNullOrEmpty(value.id))
-                    draft.SetFieldId(_priorityMeta.fieldId, value.id);
+                ApplyAllowedValue(draft, _priorityMeta.fieldId, value);
             }
 
             if (_assigneeMeta != null && _assigneeDropdown != null && _assigneeDropdown.index > 0)
             {
                 int userIndex = _assigneeDropdown.index - 1;
-                if (userIndex < _assignableUsers.Count)
-                    draft.SetFieldId(_assigneeMeta.fieldId, _assignableUsers[userIndex].accountId);
-            }
-
-            if (_teamMeta != null)
-            {
-                if (_teamDropdown != null)
-                {
-                    JiraAllowedValue value = AllowedAt(_teamMeta, _teamDropdown.index);
-                    if (value != null)
-                    {
-                        if (!string.IsNullOrEmpty(value.id))
-                            draft.SetFieldId(_teamMeta.fieldId, value.id);
-                        else
-                            draft.SetFieldValueObject(_teamMeta.fieldId, value.Display);
-                    }
-                }
-                else if (_teamText != null)
-                {
-                    draft.SetFieldString(_teamMeta.fieldId, _teamText.value?.Trim());
-                }
+                if (userIndex < _filteredAssignableUsers.Count)
+                    draft.SetFieldObject(
+                        _assigneeMeta.fieldId,
+                        "accountId",
+                        _filteredAssignableUsers[userIndex].accountId);
             }
 
             if (_startDateMeta != null && _startDateField != null)
@@ -1459,6 +2174,282 @@ namespace OxenteGames.JiraCommunication
 
             if (_dueDateMeta != null && _dueDateField != null)
                 draft.SetFieldString(_dueDateMeta.fieldId, _dueDateField.value?.Trim());
+
+            foreach (AdditionalFieldBinding binding in _additionalFields)
+                ApplyAdditionalField(draft, binding);
+        }
+
+        private bool ValidateDynamicFields(out string error)
+        {
+            if (_descriptionMeta != null && _descriptionMeta.required &&
+                string.IsNullOrWhiteSpace(_descriptionField.value))
+            {
+                error = L.Tr(L.K.MsgRequiredField, _descriptionMeta.name);
+                return false;
+            }
+
+            if (_assigneeMeta != null && _assigneeMeta.required &&
+                (_assigneeDropdown == null || _assigneeDropdown.index <= 0))
+            {
+                error = L.Tr(L.K.MsgRequiredField, _assigneeMeta.name);
+                return false;
+            }
+
+            if (!ValidateTextField(_startDateMeta, _startDateField, out error) ||
+                !ValidateTextField(_dueDateMeta, _dueDateField, out error))
+                return false;
+
+            foreach (AdditionalFieldBinding binding in _additionalFields)
+            {
+                if (binding.Meta.required && !HasAdditionalValue(binding))
+                {
+                    error = L.Tr(L.K.MsgRequiredField, binding.Meta.name);
+                    return false;
+                }
+
+                if (binding.TextField != null &&
+                    binding.Meta.schema?.type == "number" &&
+                    !string.IsNullOrWhiteSpace(binding.TextField.value) &&
+                    !TryNormalizeNumber(binding.TextField.value, out _))
+                {
+                    error = L.Tr(L.K.MsgInvalidNumber, binding.Meta.name);
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool ValidateTextField(
+            JiraFieldMeta meta,
+            TextField field,
+            out string error)
+        {
+            if (meta != null && meta.required &&
+                (field == null || string.IsNullOrWhiteSpace(field.value)))
+            {
+                error = L.Tr(L.K.MsgRequiredField, meta.name);
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool HasAdditionalValue(AdditionalFieldBinding binding)
+        {
+            if (binding.BooleanToggle != null)
+                return true;
+            if (binding.TextField != null)
+            {
+                if (binding.Meta.schema?.type != "array")
+                    return !string.IsNullOrWhiteSpace(binding.TextField.value);
+
+                foreach (string value in SplitValues(binding.TextField.value ?? string.Empty))
+                    if (!string.IsNullOrWhiteSpace(value))
+                        return true;
+                return false;
+            }
+            if (binding.Dropdown != null)
+                return binding.Meta.required
+                    ? binding.Dropdown.index >= 0
+                    : binding.Dropdown.index > 0;
+
+            foreach (Toggle toggle in binding.OptionToggles)
+                if (toggle.value)
+                    return true;
+
+            return false;
+        }
+
+        private static void ApplyAdditionalField(
+            JiraIssueDraft draft,
+            AdditionalFieldBinding binding)
+        {
+            JiraFieldMeta meta = binding.Meta;
+            string type = meta.schema?.type ?? "string";
+
+            if (binding.BooleanToggle != null)
+            {
+                draft.SetFieldBoolean(meta.fieldId, binding.BooleanToggle.value);
+                return;
+            }
+
+            if (binding.Dropdown != null)
+            {
+                int allowedIndex = binding.Meta.required
+                    ? binding.Dropdown.index
+                    : binding.Dropdown.index - 1;
+                JiraAllowedValue allowedValue = AllowedAt(meta, allowedIndex);
+                if (IsAtlassianTeamField(meta))
+                {
+                    string teamId = AllowedValueIdentifier(allowedValue);
+                    if (!string.IsNullOrWhiteSpace(teamId))
+                        draft.SetFieldString(meta.fieldId, teamId);
+                }
+                else
+                {
+                    ApplyAllowedValue(draft, meta.fieldId, allowedValue);
+                }
+                return;
+            }
+
+            if (binding.OptionToggles.Count > 0)
+            {
+                var selected = new List<KeyValuePair<string, string>>();
+                foreach (Toggle toggle in binding.OptionToggles)
+                {
+                    if (!toggle.value)
+                        continue;
+
+                    JiraAllowedValue value = toggle.userData as JiraAllowedValue;
+                    if (TryGetAllowedValue(value, out string property, out string rawValue))
+                        selected.Add(new KeyValuePair<string, string>(property, rawValue));
+                }
+
+                if (selected.Count > 0)
+                    draft.SetFieldObjectArray(meta.fieldId, selected);
+                return;
+            }
+
+            string text = binding.TextField?.value?.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            if (type == "number")
+            {
+                if (TryNormalizeNumber(text, out string number))
+                    draft.SetFieldNumber(meta.fieldId, number);
+            }
+            else if (type == "array")
+            {
+                draft.SetFieldStringArray(meta.fieldId, SplitValues(text));
+            }
+            else if (type == "user")
+            {
+                draft.SetFieldObject(meta.fieldId, "accountId", text);
+            }
+            else if (type == "option")
+            {
+                draft.SetFieldValueObject(meta.fieldId, text);
+            }
+            else if (IsMultilineField(meta))
+            {
+                draft.SetFieldAdf(meta.fieldId, text);
+            }
+            else
+            {
+                draft.SetFieldString(meta.fieldId, text);
+            }
+        }
+
+        private static void ApplyAllowedValue(
+            JiraIssueDraft draft,
+            string fieldId,
+            JiraAllowedValue value)
+        {
+            if (TryGetAllowedValue(value, out string property, out string rawValue))
+                draft.SetFieldObject(fieldId, property, rawValue);
+        }
+
+        private static bool TryGetAllowedValue(
+            JiraAllowedValue value,
+            out string property,
+            out string rawValue)
+        {
+            if (!string.IsNullOrWhiteSpace(value?.id))
+            {
+                property = "id";
+                rawValue = value.id;
+                return true;
+            }
+            if (!string.IsNullOrWhiteSpace(value?.accountId))
+            {
+                property = "accountId";
+                rawValue = value.accountId;
+                return true;
+            }
+            if (!string.IsNullOrWhiteSpace(value?.value))
+            {
+                property = "value";
+                rawValue = value.value;
+                return true;
+            }
+            if (!string.IsNullOrWhiteSpace(value?.key))
+            {
+                property = "key";
+                rawValue = value.key;
+                return true;
+            }
+            if (!string.IsNullOrWhiteSpace(value?.name))
+            {
+                property = "name";
+                rawValue = value.name;
+                return true;
+            }
+
+            property = null;
+            rawValue = null;
+            return false;
+        }
+
+        private static bool TryNormalizeNumber(string text, out string normalized)
+        {
+            if (decimal.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out decimal number) ||
+                decimal.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.CurrentCulture,
+                    out number))
+            {
+                normalized = number.ToString(CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            normalized = null;
+            return false;
+        }
+
+        private static IEnumerable<string> SplitValues(string text)
+        {
+            return text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static bool IsMultilineField(JiraFieldMeta meta)
+        {
+            return meta != null &&
+                   (meta.fieldId == "environment" ||
+                    (!string.IsNullOrWhiteSpace(meta.schema?.custom) &&
+                     meta.schema.custom.IndexOf(
+                         "textarea",
+                         StringComparison.OrdinalIgnoreCase) >= 0));
+        }
+
+        private static bool IsAtlassianTeamField(JiraFieldMeta meta)
+        {
+            string customType = meta?.schema?.custom;
+            return !string.IsNullOrWhiteSpace(customType) &&
+                   customType.IndexOf(
+                       "rm-teams-custom-field-team",
+                       StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string AllowedValueIdentifier(JiraAllowedValue value)
+        {
+            if (!string.IsNullOrWhiteSpace(value?.id))
+                return value.id;
+            if (!string.IsNullOrWhiteSpace(value?.accountId))
+                return value.accountId;
+            if (!string.IsNullOrWhiteSpace(value?.value))
+                return value.value;
+            if (!string.IsNullOrWhiteSpace(value?.key))
+                return value.key;
+            return value?.name;
         }
 
         private static JiraAllowedValue AllowedAt(JiraFieldMeta meta, int index)
@@ -1482,23 +2473,11 @@ namespace OxenteGames.JiraCommunication
             if (_assigneeDropdown != null && _assigneeDropdown.index > 0)
             {
                 int userIndex = _assigneeDropdown.index - 1;
-                if (userIndex < _assignableUsers.Count)
-                    JiraPreferences.PresetAssigneeAccountId = _assignableUsers[userIndex].accountId;
+                if (userIndex < _filteredAssignableUsers.Count)
+                    JiraPreferences.PresetAssigneeAccountId =
+                        _filteredAssignableUsers[userIndex].accountId;
             }
 
-            if (_teamMeta != null)
-            {
-                if (_teamDropdown != null)
-                {
-                    JiraAllowedValue value = AllowedAt(_teamMeta, _teamDropdown.index);
-                    if (value != null)
-                        JiraPreferences.PresetTeamValue = !string.IsNullOrEmpty(value.id) ? value.id : value.Display;
-                }
-                else if (_teamText != null)
-                {
-                    JiraPreferences.PresetTeamValue = _teamText.value?.Trim();
-                }
-            }
         }
 
         private void ShowOpenIssue(string baseUrl, string issueKey)
@@ -1571,6 +2550,7 @@ namespace OxenteGames.JiraCommunication
                 {
                     ShowStatus(result.Message, false);
                     _connectedCard.style.display = DisplayStyle.None;
+                    SetConnectionAvailability(false);
                     return;
                 }
 
@@ -1578,12 +2558,14 @@ namespace OxenteGames.JiraCommunication
                 ShowConnectedUser(result.User);
                 _myself = result.User;
                 _projectsLoaded = false;
+                SetConnectionAvailability(true);
                 SelectTab(Tab.Create);
             }
             catch (Exception exception)
             {
                 ShowStatus(exception.Message, false);
                 _connectedCard.style.display = DisplayStyle.None;
+                SetConnectionAvailability(false);
             }
             finally
             {
@@ -1607,16 +2589,54 @@ namespace OxenteGames.JiraCommunication
             _tokenField.value = string.Empty;
             _connectedCard.style.display = DisplayStyle.None;
             _projectsLoaded = false;
+            SetConnectionAvailability(false);
             ShowStatus(L.Tr(L.K.MsgTokenRemoved), true);
+            SelectTab(Tab.Connection);
         }
 
-        private void RefreshConnectionState()
+        private async void RefreshConnectionState()
         {
-            bool hasSessionToken = !string.IsNullOrWhiteSpace(JiraPreferences.SessionToken);
+            SetConnectionAvailability(false);
             _connectedCard.style.display = DisplayStyle.None;
 
-            if (hasSessionToken)
-                ShowStatus(L.Tr(L.K.MsgTokenLoaded), true);
+            if (!HasCredentials())
+                return;
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+                return;
+
+            SetBusy(true);
+            ShowStatus(L.Tr(L.K.MsgValidating), true);
+            try
+            {
+                JiraConnectionResult result = await client.TestConnectionAsync();
+                if (!result.Success)
+                {
+                    ShowStatus(result.Message, false);
+                    return;
+                }
+
+                _myself = result.User;
+                ShowConnectedUser(result.User);
+                ShowStatus(result.Message, true);
+                SetConnectionAvailability(true);
+            }
+            catch (Exception exception)
+            {
+                ShowStatus(exception.Message, false);
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
+        private void SetConnectionAvailability(bool connected)
+        {
+            _isConnected = connected;
+            if (_createTab != null)
+                _createTab.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private static bool HasCredentials()
@@ -1657,8 +2677,9 @@ namespace OxenteGames.JiraCommunication
         private void SetCreatingBusy(bool busy)
         {
             _isCreating = busy;
-            _createButton.SetEnabled(!busy);
+            _createButton.SetEnabled(!busy && !_areFieldsLoading);
             _createButton.text = busy ? L.Tr(L.K.BtnCreating) : L.Tr(L.K.BtnCreate);
+            _quickSubtaskContainer?.SetEnabled(!busy);
         }
 
         private void ShowStatus(string message, bool success)

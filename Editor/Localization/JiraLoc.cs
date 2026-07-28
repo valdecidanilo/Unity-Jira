@@ -54,15 +54,15 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.FieldUrlTooltip] = new[] { "Exemplo: https://suaempresa.atlassian.net", "Example: https://yourcompany.atlassian.net" },
             [K.FieldEmail] = new[] { "E-mail Atlassian", "Atlassian email" },
             [K.FieldToken] = new[] { "API Token", "API Token" },
-            [K.BtnConnect] = new[] { "Testar e conectar", "Test and connect" },
+            [K.BtnConnect] = new[] { " Conectar", "Connect" },
             [K.BtnConnecting] = new[] { "Conectando...", "Connecting..." },
             [K.BtnCreateToken] = new[] { "Criar token", "Create token" },
             [K.MsgFillFields] = new[] { "Preencha a URL do Jira, o e-mail e o API Token.", "Fill in the Jira URL, email and API Token." },
             [K.MsgValidating] = new[] { "Validando credenciais com o Jira...", "Validating credentials with Jira..." },
             [K.MsgTokenLoaded] = new[]
             {
-                "Há um token carregado nesta sessão. Clique em “Testar e conectar” para validar a conta.",
-                "A token is loaded in this session. Click “Test and connect” to validate the account."
+                "Há um token carregado nesta sessão. Clique em “Conectar” para validar a conta.",
+                "A token is loaded in this session. Click “Connect” to validate the account."
             },
             [K.MsgTokenRemoved] = new[] { "Token removido da sessão atual.", "Token removed from the current session." },
 
@@ -94,6 +94,8 @@ namespace OxenteGames.JiraCommunication.Localization
                 "Vincula a issue a um épico (funciona em projetos team-managed).",
                 "Links the issue to an epic (works on team-managed projects)."
             },
+            [K.MsgNoEpicsOption] = new[] { "Nenhum épico encontrado", "No epic found" },
+            [K.MsgEpicsFailedOption] = new[] { "Não foi possível carregar os épicos", "Could not load epics" },
             [K.FieldSprint] = new[] { "Sprint ativa", "Active sprint" },
             [K.FieldSprintTooltip] = new[]
             {
@@ -138,12 +140,34 @@ namespace OxenteGames.JiraCommunication.Localization
                 "Nenhum tipo de issue retornado. Verifique se sua conta tem permissão para criar issues neste projeto.",
                 "No issue types returned. Check whether your account has permission to create issues in this project."
             },
+            [K.MsgLoadingFields] = new[] { "Carregando campos configurados no Jira...", "Loading fields configured in Jira..." },
+            [K.MsgFieldsLoaded] = new[] { "{0} campos do Jira carregados para este tipo.", "{0} Jira fields loaded for this type." },
+            [K.MsgFieldsLoadFailed] = new[] { "Não foi possível carregar os campos do Jira: {0}", "Could not load Jira fields: {0}" },
+            [K.MsgNoFieldsReturned] = new[] { "O Jira não retornou os campos configurados para este tipo de issue.", "Jira returned no configured fields for this issue type." },
+            [K.MsgFieldsNotLoaded] = new[] { "Aguarde ou recarregue os campos do Jira antes de criar.", "Wait for or reload the Jira fields before creating." },
 
             [K.CreateClassifyTitle] = new[] { "Classificação", "Classification" },
-            [K.CreateDatesTitle] = new[] { "Datas (opcional)", "Dates (optional)" },
+            [K.CreateDatesTitle] = new[] { "Datas", "Dates" },
+            [K.CreateAdditionalFieldsTitle] = new[] { "Campos adicionais do Jira", "Additional Jira fields" },
+            [K.AdditionalFieldsHint] = new[]
+            {
+                "Campos com * são obrigatórios. Para informar issues, use as chaves separadas por vírgula: PROJ-123, PROJ-456.",
+                "Fields marked with * are required. For issues, use comma-separated keys: PROJ-123, PROJ-456."
+            },
+            [K.ArrayFieldHint] = new[]
+            {
+                "Informe os valores separados por vírgula. Para issues, use: PROJ-123, PROJ-456.",
+                "Enter comma-separated values. For issues, use: PROJ-123, PROJ-456."
+            },
+            [K.TeamIdHint] = new[]
+            {
+                "Informe o ID do time do Jira. Este campo é carregado conforme o projeto e o tipo da issue.",
+                "Enter the Jira team ID. This field is loaded according to the project and issue type."
+            },
             [K.CreateAttachmentTitle] = new[] { "Anexo", "Attachment" },
             [K.FieldPriority] = new[] { "Prioridade", "Priority" },
             [K.FieldAssignee] = new[] { "Responsável", "Assignee" },
+            [K.FieldAssigneeSearch] = new[] { "Pesquisar responsável", "Search assignee" },
             [K.BtnAssignSelf] = new[] { "Atribuir a mim", "Assign to me" },
             [K.AssigneeNone] = new[] { "— Não atribuir —", "— Unassigned —" },
             [K.FieldTeam] = new[] { "Time", "Team" },
@@ -151,6 +175,15 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.FieldDueDate] = new[] { "Data limite", "Due date" },
             [K.DateHint] = new[] { "Formato: AAAA-MM-DD", "Format: YYYY-MM-DD" },
             [K.BtnSelectFile] = new[] { "Selecionar arquivo / print", "Select file / screenshot" },
+            [K.BtnCaptureGameView] = new[] { "Capturar Game View", "Capture Game View" },
+            [K.CaptureGameViewHint] = new[]
+            {
+                "Captura a câmera principal e usa o PNG como anexo da issue.",
+                "Captures the main camera and uses the PNG as the issue attachment."
+            },
+            [K.MsgNoCameraForScreenshot] = new[] { "Nenhuma câmera encontrada para capturar.", "No camera was found to capture." },
+            [K.MsgScreenshotCaptured] = new[] { "Print pronto: {0}", "Screenshot ready: {0}" },
+            [K.MsgScreenshotFailed] = new[] { "Falha ao capturar: {0}", "Capture failed: {0}" },
             [K.BtnRemoveFile] = new[] { "Remover", "Remove" },
             [K.NoFileSelected] = new[] { "Nenhum arquivo selecionado.", "No file selected." },
             [K.StatusNote] = new[]
@@ -167,6 +200,22 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.MsgAttachmentFailed] = new[] { " (Anexo não enviado: {0})", " (Attachment not uploaded: {0})" },
             [K.SettingsClearPresets] = new[] { "Limpar campos salvos (presets)", "Clear saved fields (presets)" },
             [K.MsgPresetsCleared] = new[] { "Presets removidos.", "Presets cleared." },
+            [K.MsgRequiredField] = new[] { "O campo \"{0}\" é obrigatório.", "The \"{0}\" field is required." },
+            [K.MsgInvalidNumber] = new[] { "O campo \"{0}\" precisa ser um número válido.", "The \"{0}\" field must be a valid number." },
+            [K.FieldQuickSubtask] = new[] { "Subtarefas rápidas (opcional)", "Quick subtasks (optional)" },
+            [K.FieldQuickSubtaskTitle] = new[] { "Título", "Title" },
+            [K.FieldQuickSubtaskDescription] = new[] { "Descrição", "Description" },
+            [K.BtnAddQuickSubtask] = new[] { "+ Adicionar subtarefa", "+ Add subtask" },
+            [K.BtnRemoveQuickSubtask] = new[] { "Remover subtarefa", "Remove subtask" },
+            [K.QuickSubtaskNumber] = new[] { "Subtarefa {0}", "Subtask {0}" },
+            [K.QuickSubtaskHint] = new[]
+            {
+                "Use + para adicionar e − para remover. Cada item preenchido será criado junto com a História.",
+                "Use + to add and − to remove. Each filled item is created with the Story."
+            },
+            [K.MsgQuickSubtaskCreated] = new[] { " Subtarefa {0} criada.", " Subtask {0} created." },
+            [K.MsgQuickSubtaskFailed] = new[] { " (Subtarefa \"{0}\" não criada: {1})", " (Subtask \"{0}\" was not created: {1})" },
+            [K.MsgQuickSubtaskTitleRequired] = new[] { "Preencha o título da subtarefa que possui descrição.", "Enter a title for the subtask that has a description." },
 
             [K.AiProviderLabel] = new[] { "Provedor de IA", "AI provider" },
             [K.ProviderClaude] = new[] { "Claude (Anthropic)", "Claude (Anthropic)" },
@@ -186,6 +235,7 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.BtnGetAiKey] = new[] { "Obter API Key", "Get API Key" },
             [K.AiSectionTitle] = new[] { "Assistente de IA", "AI Assistant" },
             [K.AiPromptLabel] = new[] { "Descreva a atividade (a IA gera título, descrição e prioridade)", "Describe the task (AI drafts title, description and priority)" },
+            [K.BtnConfigureAi] = new[] { "Configurar Assistente de IA", "Configure AI Assistant" },
             [K.BtnAiGenerate] = new[] { "Gerar com IA", "Draft with AI" },
             [K.BtnAiGenerating] = new[] { "Gerando...", "Drafting..." },
             [K.MsgAiNoToken] = new[]
@@ -245,6 +295,8 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string ParentHint = "ParentHint";
             public const string FieldEpic = "FieldEpic";
             public const string FieldEpicTooltip = "FieldEpicTooltip";
+            public const string MsgNoEpicsOption = "MsgNoEpicsOption";
+            public const string MsgEpicsFailedOption = "MsgEpicsFailedOption";
             public const string FieldSprint = "FieldSprint";
             public const string FieldSprintTooltip = "FieldSprintTooltip";
             public const string BtnReloadProjects = "BtnReloadProjects";
@@ -268,11 +320,21 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgSprintAdded = "MsgSprintAdded";
             public const string MsgSprintFailed = "MsgSprintFailed";
             public const string MsgNoIssueTypes = "MsgNoIssueTypes";
+            public const string MsgLoadingFields = "MsgLoadingFields";
+            public const string MsgFieldsLoaded = "MsgFieldsLoaded";
+            public const string MsgFieldsLoadFailed = "MsgFieldsLoadFailed";
+            public const string MsgNoFieldsReturned = "MsgNoFieldsReturned";
+            public const string MsgFieldsNotLoaded = "MsgFieldsNotLoaded";
             public const string CreateClassifyTitle = "CreateClassifyTitle";
             public const string CreateDatesTitle = "CreateDatesTitle";
+            public const string CreateAdditionalFieldsTitle = "CreateAdditionalFieldsTitle";
+            public const string AdditionalFieldsHint = "AdditionalFieldsHint";
+            public const string ArrayFieldHint = "ArrayFieldHint";
+            public const string TeamIdHint = "TeamIdHint";
             public const string CreateAttachmentTitle = "CreateAttachmentTitle";
             public const string FieldPriority = "FieldPriority";
             public const string FieldAssignee = "FieldAssignee";
+            public const string FieldAssigneeSearch = "FieldAssigneeSearch";
             public const string BtnAssignSelf = "BtnAssignSelf";
             public const string AssigneeNone = "AssigneeNone";
             public const string FieldTeam = "FieldTeam";
@@ -280,6 +342,11 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string FieldDueDate = "FieldDueDate";
             public const string DateHint = "DateHint";
             public const string BtnSelectFile = "BtnSelectFile";
+            public const string BtnCaptureGameView = "BtnCaptureGameView";
+            public const string CaptureGameViewHint = "CaptureGameViewHint";
+            public const string MsgNoCameraForScreenshot = "MsgNoCameraForScreenshot";
+            public const string MsgScreenshotCaptured = "MsgScreenshotCaptured";
+            public const string MsgScreenshotFailed = "MsgScreenshotFailed";
             public const string BtnRemoveFile = "BtnRemoveFile";
             public const string NoFileSelected = "NoFileSelected";
             public const string StatusNote = "StatusNote";
@@ -288,6 +355,18 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAttachmentFailed = "MsgAttachmentFailed";
             public const string SettingsClearPresets = "SettingsClearPresets";
             public const string MsgPresetsCleared = "MsgPresetsCleared";
+            public const string MsgRequiredField = "MsgRequiredField";
+            public const string MsgInvalidNumber = "MsgInvalidNumber";
+            public const string FieldQuickSubtask = "FieldQuickSubtask";
+            public const string FieldQuickSubtaskTitle = "FieldQuickSubtaskTitle";
+            public const string FieldQuickSubtaskDescription = "FieldQuickSubtaskDescription";
+            public const string BtnAddQuickSubtask = "BtnAddQuickSubtask";
+            public const string BtnRemoveQuickSubtask = "BtnRemoveQuickSubtask";
+            public const string QuickSubtaskNumber = "QuickSubtaskNumber";
+            public const string QuickSubtaskHint = "QuickSubtaskHint";
+            public const string MsgQuickSubtaskCreated = "MsgQuickSubtaskCreated";
+            public const string MsgQuickSubtaskFailed = "MsgQuickSubtaskFailed";
+            public const string MsgQuickSubtaskTitleRequired = "MsgQuickSubtaskTitleRequired";
             public const string AiProviderLabel = "AiProviderLabel";
             public const string ProviderClaude = "ProviderClaude";
             public const string ProviderOpenAi = "ProviderOpenAi";
@@ -302,6 +381,7 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string BtnGetAiKey = "BtnGetAiKey";
             public const string AiSectionTitle = "AiSectionTitle";
             public const string AiPromptLabel = "AiPromptLabel";
+            public const string BtnConfigureAi = "BtnConfigureAi";
             public const string BtnAiGenerate = "BtnAiGenerate";
             public const string BtnAiGenerating = "BtnAiGenerating";
             public const string MsgAiNoToken = "MsgAiNoToken";
