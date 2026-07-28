@@ -21,6 +21,11 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AiTokenKey = BaseKey + "Ai.Token";
         private const string AiModelKey = BaseKey + "Ai.Model";
         private const string AiProviderKey = BaseKey + "Ai.Provider";
+        private const string GitEnabledKey = BaseKey + "Git.Enabled";
+        private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
+        private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
+        private const string GitBranchTemplateKey = BaseKey + "Git.BranchTemplate";
+        private const string GitCommitTemplateKey = BaseKey + "Git.CommitTemplate";
 
         // Not cryptographic security. It only keeps tokens from being stored as
         // readable plaintext in the EditorPrefs registry/plist.
@@ -158,6 +163,42 @@ namespace OxenteGames.JiraCommunication.Settings
         public static void SetAiModel(string provider, string value)
         {
             EditorPrefs.SetString(AiModelKey + "." + provider, value ?? string.Empty);
+        }
+
+        // --- Git / GitHub integration ---
+        // Convention-only: no remote actions, no secrets. Persisted across sessions.
+
+        public static bool GitEnabled
+        {
+            get => EditorPrefs.GetBool(GitEnabledKey, false);
+            set => EditorPrefs.SetBool(GitEnabledKey, value);
+        }
+
+        // Empty = auto-detect the repository root from the Unity project folder.
+        public static string GitRepoPath
+        {
+            get => EditorPrefs.GetString(GitRepoPathKey, string.Empty);
+            set => EditorPrefs.SetString(GitRepoPathKey, value ?? string.Empty);
+        }
+
+        public static string GitBaseBranch
+        {
+            get => EditorPrefs.GetString(GitBaseBranchKey, "main");
+            set => EditorPrefs.SetString(GitBaseBranchKey, value ?? string.Empty);
+        }
+
+        public static string GitBranchTemplate
+        {
+            get => EditorPrefs.GetString(GitBranchTemplateKey,
+                Git.GitConventions.DefaultBranchTemplate);
+            set => EditorPrefs.SetString(GitBranchTemplateKey, value ?? string.Empty);
+        }
+
+        public static string GitCommitTemplate
+        {
+            get => EditorPrefs.GetString(GitCommitTemplateKey,
+                Git.GitConventions.DefaultCommitTemplate);
+            set => EditorPrefs.SetString(GitCommitTemplateKey, value ?? string.Empty);
         }
 
         public static void ClearPresets()

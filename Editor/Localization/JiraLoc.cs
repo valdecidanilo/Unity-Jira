@@ -529,6 +529,55 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.SettingsClearData] = new[] { "Limpar URL, e-mail e token", "Clear URL, email and token" },
             [K.MsgDataCleared] = new[] { "Dados de conexão removidos.", "Connection data removed." },
+
+            // --- Git / GitHub integration ---
+            [K.GitSettingsTitle] = new[] { "Integração Git / GitHub", "Git / GitHub integration" },
+            [K.GitSettingsNote] = new[]
+            {
+                "Padroniza o nome do branch e a mensagem de commit por atividade (ex.: feat(PROJ-123): título). Nada é enviado ao GitHub — a ligação com o Jira é feita pelo app oficial \"GitHub for Jira\".",
+                "Standardizes the branch name and commit message per activity (e.g. feat(PROJ-123): title). Nothing is pushed to GitHub — the Jira link is handled by the official \"GitHub for Jira\" app."
+            },
+            [K.GitEnableToggle] = new[] { "Habilitar integração Git", "Enable Git integration" },
+            [K.GitRepoPathLabel] = new[] { "Pasta do repositório (vazio = detectar)", "Repository folder (empty = auto-detect)" },
+            [K.BtnDetectRepo] = new[] { "Detectar", "Detect" },
+            [K.GitBaseBranchLabel] = new[] { "Branch base", "Base branch" },
+            [K.GitBranchTemplateLabel] = new[] { "Template do branch", "Branch template" },
+            [K.GitCommitTemplateLabel] = new[] { "Template do commit", "Commit template" },
+            [K.GitTemplateHint] = new[]
+            {
+                "Placeholders: {type} {key} {slug} {title}.",
+                "Placeholders: {type} {key} {slug} {title}."
+            },
+            [K.GitNativeLinkNote] = new[]
+            {
+                "Para o Jira mostrar branches/commits/PRs no painel Development e mover a issue automaticamente (ex.: PR aberto → Code Review, PR merjado → Concluído), instale o app \"GitHub for Jira\" e crie regras de Automation. Basta a chave (ex.: PROJ-123) aparecer no branch/commit/PR.",
+                "For Jira to show branches/commits/PRs in the Development panel and move the issue automatically (e.g. PR opened → Code Review, PR merged → Done), install the \"GitHub for Jira\" app and create Automation rules. Just include the key (e.g. PROJ-123) in the branch/commit/PR."
+            },
+            [K.BtnInstallGithubJira] = new[] { "Instalar GitHub for Jira", "Install GitHub for Jira" },
+            [K.GitCardTitle] = new[] { "Git — branch & commit", "Git — branch & commit" },
+            [K.GitTypeLabel] = new[] { "Tipo (Conventional)", "Type (Conventional)" },
+            [K.GitBranchPreview] = new[] { "Branch", "Branch" },
+            [K.GitCommitPreview] = new[] { "Commit", "Commit" },
+            [K.GitCurrentBranch] = new[] { "Branch atual: {0}", "Current branch: {0}" },
+            [K.BtnGitCreateBranch] = new[] { "Criar / checkout branch", "Create / checkout branch" },
+            [K.BtnGitCopyCommit] = new[] { "Copiar commit", "Copy commit" },
+            [K.BtnGitCopyBranch] = new[] { "Copiar branch", "Copy branch" },
+            [K.MsgGitRepoDetected] = new[] { "Repositório: {0}", "Repository: {0}" },
+            [K.MsgGitRepoNotFound] = new[]
+            {
+                "Nenhum repositório Git encontrado a partir do projeto. Informe a pasta manualmente.",
+                "No Git repository found from the project. Set the folder manually."
+            },
+            [K.MsgGitNotInstalled] = new[]
+            {
+                "Git não encontrado no PATH. Instale o Git para usar esta integração.",
+                "Git was not found on PATH. Install Git to use this integration."
+            },
+            [K.MsgGitWorking] = new[] { "Executando git...", "Running git..." },
+            [K.MsgGitBranchReady] = new[] { "Branch pronto: {0}", "Branch ready: {0}" },
+            [K.MsgGitBranchFailed] = new[] { "Falha no git: {0}", "Git error: {0}" },
+            [K.MsgGitCopiedCommit] = new[] { "Mensagem de commit copiada.", "Commit message copied." },
+            [K.MsgGitCopiedBranch] = new[] { "Nome do branch copiado.", "Branch name copied." },
         };
 
         internal static class K
@@ -798,6 +847,34 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string SettingsDataNote = "SettingsDataNote";
             public const string SettingsClearData = "SettingsClearData";
             public const string MsgDataCleared = "MsgDataCleared";
+
+            public const string GitSettingsTitle = "GitSettingsTitle";
+            public const string GitSettingsNote = "GitSettingsNote";
+            public const string GitEnableToggle = "GitEnableToggle";
+            public const string GitRepoPathLabel = "GitRepoPathLabel";
+            public const string BtnDetectRepo = "BtnDetectRepo";
+            public const string GitBaseBranchLabel = "GitBaseBranchLabel";
+            public const string GitBranchTemplateLabel = "GitBranchTemplateLabel";
+            public const string GitCommitTemplateLabel = "GitCommitTemplateLabel";
+            public const string GitTemplateHint = "GitTemplateHint";
+            public const string GitNativeLinkNote = "GitNativeLinkNote";
+            public const string BtnInstallGithubJira = "BtnInstallGithubJira";
+            public const string GitCardTitle = "GitCardTitle";
+            public const string GitTypeLabel = "GitTypeLabel";
+            public const string GitBranchPreview = "GitBranchPreview";
+            public const string GitCommitPreview = "GitCommitPreview";
+            public const string GitCurrentBranch = "GitCurrentBranch";
+            public const string BtnGitCreateBranch = "BtnGitCreateBranch";
+            public const string BtnGitCopyCommit = "BtnGitCopyCommit";
+            public const string BtnGitCopyBranch = "BtnGitCopyBranch";
+            public const string MsgGitRepoDetected = "MsgGitRepoDetected";
+            public const string MsgGitRepoNotFound = "MsgGitRepoNotFound";
+            public const string MsgGitNotInstalled = "MsgGitNotInstalled";
+            public const string MsgGitWorking = "MsgGitWorking";
+            public const string MsgGitBranchReady = "MsgGitBranchReady";
+            public const string MsgGitBranchFailed = "MsgGitBranchFailed";
+            public const string MsgGitCopiedCommit = "MsgGitCopiedCommit";
+            public const string MsgGitCopiedBranch = "MsgGitCopiedBranch";
         }
     }
 }

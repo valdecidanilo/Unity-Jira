@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 - 2026-07-28
+
+- Nova **integração Git/GitHub por convenção** (aba Configurações → *Integração Git / GitHub*).
+- No detalhe de cada atividade (aba **Atividades**), preview ao vivo do **nome do branch** (`feat/PROJ-123-titulo`) e da **mensagem de commit** Conventional (`feat(PROJ-123): título`), com tipo escolhido pelo desenvolvedor.
+- Botões para **criar/checkout do branch** localmente e **copiar** o commit ou o nome do branch (nada é enviado ao GitHub; token do GitHub não é necessário).
+- Detecção automática da raiz do repositório (`git rev-parse`), com override manual, branch base e templates editáveis.
+- Documentado o passo a passo para linkagem nativa via app **GitHub for Jira** + regras de Automation (PR aberto → Code Review, PR merjado → Concluído).
+
 ## 0.7.0 - 2026-07-28
 
 - Status da aba **Atividades** sincronizados dinamicamente com o Jira Cloud.

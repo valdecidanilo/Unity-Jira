@@ -20,7 +20,8 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 - Troca automática para a aba de criação quando a conexão é validada.
 - Aba **Resolver**: liste suas issues em aberto e as reabertas, **fixe** as importantes, aplique as **transições** do workflow da empresa, **comente**, **anexe** o print/arquivo do fix e **mencione pessoas** (@) — tudo de dentro do Unity.
 - **Assistente de IA** na aba Criar: descreva a atividade em poucas palavras e a IA preenche título, descrição e prioridade. Suporta **Claude (Anthropic)** e **ChatGPT (OpenAI)** — cada usuário usa sua própria API Key (mantida só na sessão do Unity), com escolha de provedor e modelo nas Configurações.
-- Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA e limpeza dos dados de conexão salvos.
+- **Integração Git/GitHub por convenção**: no detalhe de cada atividade, gera o **nome do branch** (`feat/PROJ-123-titulo`) e a **mensagem de commit** Conventional (`feat(PROJ-123): título`), cria/faz checkout do branch localmente e copia os textos — sem enviar nada ao GitHub e sem precisar de token do GitHub.
+- Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA, integração Git/GitHub e limpeza dos dados de conexão salvos.
 - Mensagens amigáveis para erros HTTP comuns.
 - URL e e-mail salvos apenas nas preferências locais do Editor.
 - API Token mantido somente na sessão atual do Unity por padrão.
@@ -71,6 +72,40 @@ No menu `Jira` ficam disponíveis somente:
 - `Jira Workspace`
 - `Documentação oficial do Jira`
 - `Documentação do GitHub`
+
+## Integração Git/GitHub
+
+A ferramenta padroniza a **convenção** de branch e commit; a ligação entre Jira e
+GitHub é mantida de forma **nativa**, sem código nem segredos guardados.
+
+### 1. Na ferramenta (convenção)
+
+Em `Configurações → Integração Git / GitHub`, habilite a integração e ajuste
+(se quiser) a pasta do repositório, o branch base e os templates:
+
+- Branch: `{type}/{key}-{slug}` → `feat/PROJ-123-corrigir-login`
+- Commit: `{type}({key}): {title}` → `feat(PROJ-123): corrigir login`
+- Placeholders: `{type}` `{key}` `{slug}` `{title}`.
+
+Ao selecionar uma atividade na aba **Atividades**, o tipo Conventional é sugerido
+a partir do tipo da issue (Bug → `fix`, demais → `feat`) e pode ser trocado. Use
+**Criar / checkout branch** para começar a trabalhar já no branch certo, ou os
+botões de **copiar** para colar o commit/branch onde preferir.
+
+### 2. Linkagem automática (app oficial)
+
+Para o Jira exibir branches/commits/PRs no painel **Development** e mover a issue
+automaticamente conforme o estado do PR:
+
+1. Instale o app **[GitHub for Jira](https://github.com/marketplace/jira-software-github)**
+   (gratuito) e conecte a organização/repositório.
+2. Como todo branch/commit/PR carrega a chave (ex.: `PROJ-123`), a associação
+   passa a ser automática — sem configuração extra por atividade.
+3. (Opcional) Crie regras em **Jira → Automation**, por exemplo:
+   - *Pull request criado* → transição para **Code Review**;
+   - *Pull request merjado* → transição para **Concluído**.
+
+Assim o desenvolvedor só escolhe o estado/semântica; a plataforma cuida do resto.
 
 ## Segurança
 

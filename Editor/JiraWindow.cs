@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using OxenteGames.JiraCommunication.AI;
 using OxenteGames.JiraCommunication.API;
+using OxenteGames.JiraCommunication.Git;
 using OxenteGames.JiraCommunication.Models;
 using OxenteGames.JiraCommunication.Settings;
 using OxenteGames.JiraCommunication.UI;
@@ -285,6 +286,18 @@ namespace OxenteGames.JiraCommunication
         private VisualElement _mentionChips;
         private Label _resolveAttachmentLabel;
         private Label _resolveStatus;
+
+        // Git integration (Resolve detail)
+        private VisualElement _gitCard;
+        private DropdownField _gitTypeDropdown;
+        private Label _gitBranchPreview;
+        private Label _gitCommitPreview;
+        private Label _gitCurrentBranchLabel;
+        private Label _gitStatus;
+        private bool _gitTypeUserPicked;
+        private bool _gitBusy;
+        private string _gitRepoRootCache;
+
         private JiraWorkflowStatus _selectedResolveStatus;
         private JiraUser _selectedResolveAssignee;
         private int _resolveIssuePage;
@@ -883,6 +896,8 @@ namespace OxenteGames.JiraCommunication
             openButton.name = "resolve-open";
             openButton.style.marginTop = 0;
             _resolveDetailBody.Add(openButton);
+
+            _resolveDetailBody.Add(BuildResolveGitCard());
 
             var editCard = new VisualElement();
             JiraStyles.ApplyNestedCard(editCard);
@@ -3718,6 +3733,8 @@ namespace OxenteGames.JiraCommunication
             _resolveDetailHeader.text = $"{issue.key} — {issue.Summary}";
             _resolveDetailHeader.tooltip = issue.Summary;
             SetDetailInteractable(true);
+            _gitTypeUserPicked = false;
+            RefreshResolveGitCard();
             SetResolveStatus(L.Tr(L.K.MsgLoadingIssueEdit), true);
             LoadSelectedIssueForEditAsync(issue, detailVersion);
         }
@@ -4973,6 +4990,7 @@ namespace OxenteGames.JiraCommunication
                 _resolveOriginalWeight = normalizedWeight;
                 _resolveDetailHeader.text = $"{issue.key} — {summary}";
                 _resolveDetailHeader.tooltip = summary;
+                UpdateGitPreviews();
                 RenderIssueList();
                 SetResolveStatus(L.Tr(L.K.MsgIssueEditSaved), true);
             }
@@ -6863,6 +6881,7 @@ namespace OxenteGames.JiraCommunication
             panel.Add(languageCard);
 
             panel.Add(BuildAiSettingsCard());
+            panel.Add(BuildGitSettingsCard());
 
             var dataCard = new VisualElement();
             JiraStyles.ApplyCard(dataCard);
@@ -6964,6 +6983,326 @@ namespace OxenteGames.JiraCommunication
             card.Add(getKeyButton);
 
             return card;
+        }
+
+        // --- Git / GitHub integration --------------------------------------
+
+        private VisualElement BuildGitSettingsCard()
+        {
+            var card = new VisualElement();
+            JiraStyles.ApplyCard(card);
+
+            var title = new Label(L.Tr(L.K.GitSettingsTitle));
+            JiraStyles.ApplySectionTitle(title);
+            card.Add(title);
+
+            var note = new Label(L.Tr(L.K.GitSettingsNote));
+            JiraStyles.ApplyMuted(note);
+            note.style.marginBottom = 12;
+            note.style.whiteSpace = WhiteSpace.Normal;
+            card.Add(note);
+
+            var enableToggle = new Toggle(L.Tr(L.K.GitEnableToggle)) { value = JiraPreferences.GitEnabled };
+            enableToggle.style.marginBottom = 8;
+            enableToggle.RegisterValueChangedCallback(evt =>
+            {
+                JiraPreferences.GitEnabled = evt.newValue;
+                RefreshResolveGitCard();
+            });
+            card.Add(enableToggle);
+
+            var repoField = new TextField(L.Tr(L.K.GitRepoPathLabel)) { value = JiraPreferences.GitRepoPath };
+            JiraStyles.ApplyField(repoField);
+            repoField.RegisterValueChangedCallback(evt =>
+            {
+                JiraPreferences.GitRepoPath = evt.newValue?.Trim();
+                _gitRepoRootCache = null;
+            });
+            card.Add(repoField);
+
+            var detectStatus = new Label();
+            JiraStyles.ApplyFieldHint(detectStatus);
+            detectStatus.style.whiteSpace = WhiteSpace.Normal;
+
+            var detectButton = new Button(async () =>
+            {
+                detectStatus.text = L.Tr(L.K.MsgGitWorking);
+                string root = await ResolveGitRepoRootAsync(true);
+                detectStatus.text = string.IsNullOrEmpty(root)
+                    ? L.Tr(L.K.MsgGitRepoNotFound)
+                    : L.Tr(L.K.MsgGitRepoDetected, root);
+            })
+            { text = L.Tr(L.K.BtnDetectRepo) };
+            JiraStyles.ApplyGhostButton(detectButton);
+            card.Add(detectButton);
+            card.Add(detectStatus);
+
+            var baseField = new TextField(L.Tr(L.K.GitBaseBranchLabel)) { value = JiraPreferences.GitBaseBranch };
+            JiraStyles.ApplyField(baseField);
+            baseField.RegisterValueChangedCallback(evt => JiraPreferences.GitBaseBranch = evt.newValue?.Trim());
+            card.Add(baseField);
+
+            var branchTemplateField = new TextField(L.Tr(L.K.GitBranchTemplateLabel))
+            {
+                value = JiraPreferences.GitBranchTemplate
+            };
+            JiraStyles.ApplyField(branchTemplateField);
+            branchTemplateField.RegisterValueChangedCallback(evt => JiraPreferences.GitBranchTemplate = evt.newValue);
+            card.Add(branchTemplateField);
+
+            var commitTemplateField = new TextField(L.Tr(L.K.GitCommitTemplateLabel))
+            {
+                value = JiraPreferences.GitCommitTemplate
+            };
+            JiraStyles.ApplyField(commitTemplateField);
+            commitTemplateField.RegisterValueChangedCallback(evt => JiraPreferences.GitCommitTemplate = evt.newValue);
+            card.Add(commitTemplateField);
+
+            var templateHint = new Label(L.Tr(L.K.GitTemplateHint));
+            JiraStyles.ApplyFieldHint(templateHint);
+            card.Add(templateHint);
+
+            var linkNote = new Label(L.Tr(L.K.GitNativeLinkNote));
+            JiraStyles.ApplyMuted(linkNote);
+            linkNote.style.marginTop = 12;
+            linkNote.style.marginBottom = 8;
+            linkNote.style.whiteSpace = WhiteSpace.Normal;
+            card.Add(linkNote);
+
+            var installButton = new Button(
+                () => Application.OpenURL("https://github.com/marketplace/jira-software-github"))
+            {
+                text = L.Tr(L.K.BtnInstallGithubJira)
+            };
+            JiraStyles.ApplySecondaryButton(installButton);
+            card.Add(installButton);
+
+            return card;
+        }
+
+        private VisualElement BuildResolveGitCard()
+        {
+            _gitCard = new VisualElement();
+            JiraStyles.ApplyNestedCard(_gitCard);
+            _gitCard.style.marginTop = 10;
+            _gitCard.style.marginBottom = 10;
+
+            var title = new Label(L.Tr(L.K.GitCardTitle));
+            JiraStyles.ApplyDynamicFieldLabel(title);
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _gitCard.Add(title);
+
+            _gitCurrentBranchLabel = new Label();
+            JiraStyles.ApplyFieldHint(_gitCurrentBranchLabel);
+            _gitCurrentBranchLabel.style.marginTop = 0;
+            _gitCard.Add(_gitCurrentBranchLabel);
+
+            _gitTypeDropdown = new DropdownField(L.Tr(L.K.GitTypeLabel))
+            {
+                choices = new List<string>(GitConventions.Types)
+            };
+            JiraStyles.ApplyDropdown(_gitTypeDropdown);
+            _gitTypeDropdown.SetValueWithoutNotify(GitConventions.Types[0]);
+            _gitTypeDropdown.RegisterValueChangedCallback(_ =>
+            {
+                _gitTypeUserPicked = true;
+                UpdateGitPreviews();
+            });
+            _gitCard.Add(_gitTypeDropdown);
+
+            _gitBranchPreview = new Label();
+            _gitBranchPreview.style.whiteSpace = WhiteSpace.Normal;
+            _gitBranchPreview.style.marginTop = 6;
+            _gitBranchPreview.style.color = new StyleColor(new Color32(238, 240, 244, 255));
+            _gitCard.Add(_gitBranchPreview);
+
+            _gitCommitPreview = new Label();
+            _gitCommitPreview.style.whiteSpace = WhiteSpace.Normal;
+            _gitCommitPreview.style.marginTop = 2;
+            _gitCommitPreview.style.marginBottom = 8;
+            _gitCommitPreview.style.color = new StyleColor(new Color32(238, 240, 244, 255));
+            _gitCard.Add(_gitCommitPreview);
+
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.flexWrap = Wrap.Wrap;
+
+            var createBtn = new Button(CreateOrCheckoutBranchClickedAsync) { text = L.Tr(L.K.BtnGitCreateBranch) };
+            JiraStyles.ApplySecondaryButton(createBtn);
+            createBtn.style.marginRight = 8;
+
+            var copyCommit = new Button(CopyGitCommit) { text = L.Tr(L.K.BtnGitCopyCommit) };
+            JiraStyles.ApplyGhostButton(copyCommit);
+            copyCommit.style.marginRight = 8;
+
+            var copyBranch = new Button(CopyGitBranch) { text = L.Tr(L.K.BtnGitCopyBranch) };
+            JiraStyles.ApplyGhostButton(copyBranch);
+
+            row.Add(createBtn);
+            row.Add(copyCommit);
+            row.Add(copyBranch);
+            _gitCard.Add(row);
+
+            _gitStatus = new Label();
+            _gitStatus.style.display = DisplayStyle.None;
+            _gitCard.Add(_gitStatus);
+
+            _gitCard.style.display = DisplayStyle.None;
+            return _gitCard;
+        }
+
+        private void RefreshResolveGitCard()
+        {
+            if (_gitCard == null)
+                return;
+
+            bool show = JiraPreferences.GitEnabled && _selectedIssue != null;
+            _gitCard.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show)
+                return;
+
+            if (!_gitTypeUserPicked)
+            {
+                string suggested = GitConventions.DefaultTypeFor(_selectedIssue.fields?.issuetype);
+                int index = Array.IndexOf(GitConventions.Types, suggested);
+                _gitTypeDropdown.SetValueWithoutNotify(
+                    index >= 0 ? GitConventions.Types[index] : GitConventions.Types[0]);
+            }
+
+            HideGitStatus();
+            UpdateGitPreviews();
+            RefreshGitCurrentBranchAsync();
+        }
+
+        private void UpdateGitPreviews()
+        {
+            if (_selectedIssue == null || _gitBranchPreview == null || _gitCommitPreview == null)
+                return;
+
+            string type = CurrentGitType();
+            _gitBranchPreview.text = "» " + GitConventions.BuildBranch(
+                JiraPreferences.GitBranchTemplate, type, _selectedIssue.key, _selectedIssue.Summary);
+            _gitCommitPreview.text = "» " + GitConventions.BuildCommit(
+                JiraPreferences.GitCommitTemplate, type, _selectedIssue.key, _selectedIssue.Summary);
+        }
+
+        private string CurrentGitType()
+        {
+            string value = _gitTypeDropdown?.value;
+            return string.IsNullOrWhiteSpace(value) ? GitConventions.Types[0] : value;
+        }
+
+        private async void RefreshGitCurrentBranchAsync()
+        {
+            if (_gitCurrentBranchLabel == null)
+                return;
+
+            string root = await ResolveGitRepoRootAsync(false);
+            if (string.IsNullOrEmpty(root))
+            {
+                _gitCurrentBranchLabel.text = L.Tr(L.K.MsgGitRepoNotFound);
+                return;
+            }
+
+            string branch = await GitClient.GetCurrentBranchAsync(root);
+            _gitCurrentBranchLabel.text = string.IsNullOrEmpty(branch)
+                ? string.Empty
+                : L.Tr(L.K.GitCurrentBranch, branch);
+        }
+
+        private async Task<string> ResolveGitRepoRootAsync(bool forceRefresh)
+        {
+            if (!forceRefresh && !string.IsNullOrEmpty(_gitRepoRootCache))
+                return _gitRepoRootCache;
+
+            string overridePath = JiraPreferences.GitRepoPath;
+            string startDir = string.IsNullOrWhiteSpace(overridePath)
+                ? Path.GetDirectoryName(Application.dataPath) // project root (parent of /Assets)
+                : overridePath;
+
+            string root = await GitClient.GetRepoRootAsync(startDir);
+            _gitRepoRootCache = root;
+            return root;
+        }
+
+        private async void CreateOrCheckoutBranchClickedAsync()
+        {
+            if (_gitBusy || _selectedIssue == null)
+                return;
+
+            string root = await ResolveGitRepoRootAsync(true);
+            if (string.IsNullOrEmpty(root))
+            {
+                SetGitStatus(L.Tr(L.K.MsgGitRepoNotFound), false);
+                return;
+            }
+
+            string branch = GitConventions.BuildBranch(
+                JiraPreferences.GitBranchTemplate, CurrentGitType(), _selectedIssue.key, _selectedIssue.Summary);
+
+            _gitBusy = true;
+            SetGitStatus(L.Tr(L.K.MsgGitWorking), true);
+            try
+            {
+                GitResult result = await GitClient.CreateOrCheckoutBranchAsync(
+                    root, branch, JiraPreferences.GitBaseBranch);
+
+                if (GitClient.IsGitMissing(result))
+                {
+                    SetGitStatus(L.Tr(L.K.MsgGitNotInstalled), false);
+                    return;
+                }
+
+                if (result.Success)
+                {
+                    SetGitStatus(L.Tr(L.K.MsgGitBranchReady, branch), true);
+                    RefreshGitCurrentBranchAsync();
+                }
+                else
+                {
+                    SetGitStatus(L.Tr(L.K.MsgGitBranchFailed, result.ShortMessage), false);
+                }
+            }
+            finally
+            {
+                _gitBusy = false;
+            }
+        }
+
+        private void CopyGitCommit()
+        {
+            if (_selectedIssue == null)
+                return;
+
+            EditorGUIUtility.systemCopyBuffer = GitConventions.BuildCommit(
+                JiraPreferences.GitCommitTemplate, CurrentGitType(), _selectedIssue.key, _selectedIssue.Summary);
+            SetGitStatus(L.Tr(L.K.MsgGitCopiedCommit), true);
+        }
+
+        private void CopyGitBranch()
+        {
+            if (_selectedIssue == null)
+                return;
+
+            EditorGUIUtility.systemCopyBuffer = GitConventions.BuildBranch(
+                JiraPreferences.GitBranchTemplate, CurrentGitType(), _selectedIssue.key, _selectedIssue.Summary);
+            SetGitStatus(L.Tr(L.K.MsgGitCopiedBranch), true);
+        }
+
+        private void SetGitStatus(string message, bool success)
+        {
+            if (_gitStatus == null)
+                return;
+
+            _gitStatus.text = message;
+            _gitStatus.style.display = DisplayStyle.Flex;
+            JiraStyles.ApplyStatus(_gitStatus, success);
+        }
+
+        private void HideGitStatus()
+        {
+            if (_gitStatus != null)
+                _gitStatus.style.display = DisplayStyle.None;
         }
 
         private void ClearPresets()
