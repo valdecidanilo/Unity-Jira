@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEditor;
 
 namespace OxenteGames.JiraCommunication.Settings
@@ -9,16 +11,52 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string PinnedIssuesKey = BaseKey + "Resolve.Pinned";
         private const string BaseUrlKey = BaseKey + "BaseUrl";
         private const string EmailKey = BaseKey + "Email";
-        private const string TokenSessionKey = BaseKey + "Token.Session";
+        private const string TokenKey = BaseKey + "Token";
         private const string LanguageKey = BaseKey + "Language";
         private const string PresetProjectKey = BaseKey + "Preset.ProjectKey";
         private const string PresetIssueTypeKey = BaseKey + "Preset.IssueTypeName";
         private const string PresetPriorityKey = BaseKey + "Preset.PriorityId";
         private const string PresetAssigneeKey = BaseKey + "Preset.AssigneeAccountId";
         private const string PresetTeamKey = BaseKey + "Preset.TeamValue";
-        private const string AiTokenSessionKey = BaseKey + "Ai.Token.Session";
+        private const string AiTokenKey = BaseKey + "Ai.Token";
         private const string AiModelKey = BaseKey + "Ai.Model";
         private const string AiProviderKey = BaseKey + "Ai.Provider";
+
+        // Not cryptographic security. It only keeps tokens from being stored as
+        // readable plaintext in the EditorPrefs registry/plist.
+        private static readonly byte[] ObfuscationKey =
+            Encoding.UTF8.GetBytes("OxenteGames.JiraCommunication.Token");
+
+        private static string Obfuscate(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            byte[] bytes = Encoding.UTF8.GetBytes(value);
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] ^= ObfuscationKey[i % ObfuscationKey.Length];
+
+            return Convert.ToBase64String(bytes);
+        }
+
+        private static string Deobfuscate(string stored)
+        {
+            if (string.IsNullOrEmpty(stored))
+                return string.Empty;
+
+            try
+            {
+                byte[] bytes = Convert.FromBase64String(stored);
+                for (int i = 0; i < bytes.Length; i++)
+                    bytes[i] ^= ObfuscationKey[i % ObfuscationKey.Length];
+
+                return Encoding.UTF8.GetString(bytes);
+            }
+            catch (FormatException)
+            {
+                return string.Empty;
+            }
+        }
 
         public static string BaseUrl
         {
@@ -32,16 +70,17 @@ namespace OxenteGames.JiraCommunication.Settings
             set => EditorPrefs.SetString(EmailKey, value ?? string.Empty);
         }
 
-        // Intentionally session-only. It is cleared when the Unity Editor closes.
-        public static string SessionToken
+        // Persisted across Editor sessions so the user does not have to re-enter
+        // the token every time. Stored obfuscated (not encrypted).
+        public static string Token
         {
-            get => SessionState.GetString(TokenSessionKey, string.Empty);
-            set => SessionState.SetString(TokenSessionKey, value ?? string.Empty);
+            get => Deobfuscate(EditorPrefs.GetString(TokenKey, string.Empty));
+            set => EditorPrefs.SetString(TokenKey, Obfuscate(value));
         }
 
-        public static void ClearSessionToken()
+        public static void ClearToken()
         {
-            SessionState.EraseString(TokenSessionKey);
+            EditorPrefs.DeleteKey(TokenKey);
         }
 
         // "pt" or "en". Defaults to Portuguese.
@@ -55,7 +94,7 @@ namespace OxenteGames.JiraCommunication.Settings
         {
             EditorPrefs.DeleteKey(BaseUrlKey);
             EditorPrefs.DeleteKey(EmailKey);
-            ClearSessionToken();
+            ClearToken();
         }
 
         // --- Create-form presets (persist across sessions) ---
@@ -90,7 +129,7 @@ namespace OxenteGames.JiraCommunication.Settings
             set => EditorPrefs.SetString(PresetTeamKey, value ?? string.Empty);
         }
 
-        // AI assistant. Provider is persisted; tokens are session-only (like the Jira token).
+        // AI assistant. Provider and tokens are persisted across sessions (like the Jira token).
         public const string ProviderAnthropic = "anthropic";
         public const string ProviderOpenAi = "openai";
 
@@ -102,12 +141,12 @@ namespace OxenteGames.JiraCommunication.Settings
 
         public static string GetAiToken(string provider)
         {
-            return SessionState.GetString(AiTokenSessionKey + "." + provider, string.Empty);
+            return Deobfuscate(EditorPrefs.GetString(AiTokenKey + "." + provider, string.Empty));
         }
 
         public static void SetAiToken(string provider, string value)
         {
-            SessionState.SetString(AiTokenSessionKey + "." + provider, value ?? string.Empty);
+            EditorPrefs.SetString(AiTokenKey + "." + provider, Obfuscate(value));
         }
 
         public static string GetAiModel(string provider)

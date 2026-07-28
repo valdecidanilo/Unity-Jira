@@ -1029,7 +1029,7 @@ namespace OxenteGames.JiraCommunication
 
             _tokenField = new TextField(L.Tr(L.K.FieldToken))
             {
-                value = JiraPreferences.SessionToken,
+                value = JiraPreferences.Token,
                 isPasswordField = true
             };
             JiraStyles.ApplyField(_tokenField);
@@ -3282,7 +3282,7 @@ namespace OxenteGames.JiraCommunication
 
             JiraPreferences.BaseUrl = baseUrl;
             JiraPreferences.Email = email;
-            JiraPreferences.SessionToken = token;
+            JiraPreferences.Token = token;
 
             SetBusy(true);
             ShowStatus(L.Tr(L.K.MsgValidating), true);
@@ -3332,7 +3332,7 @@ namespace OxenteGames.JiraCommunication
 
         private void Disconnect()
         {
-            JiraPreferences.ClearSessionToken();
+            JiraPreferences.ClearToken();
             _tokenField.value = string.Empty;
             _connectedCard.style.display = DisplayStyle.None;
             _projectsLoaded = false;
@@ -3392,7 +3392,7 @@ namespace OxenteGames.JiraCommunication
         {
             return !string.IsNullOrWhiteSpace(JiraPreferences.BaseUrl)
                 && !string.IsNullOrWhiteSpace(JiraPreferences.Email)
-                && !string.IsNullOrWhiteSpace(JiraPreferences.SessionToken);
+                && !string.IsNullOrWhiteSpace(JiraPreferences.Token);
         }
 
         private static JiraClient BuildClientOrNull()
@@ -3402,7 +3402,7 @@ namespace OxenteGames.JiraCommunication
 
             try
             {
-                var auth = new JiraBasicTokenAuthProvider(JiraPreferences.Email, JiraPreferences.SessionToken);
+                var auth = new JiraBasicTokenAuthProvider(JiraPreferences.Email, JiraPreferences.Token);
                 return new JiraClient(JiraPreferences.BaseUrl, auth);
             }
             catch

@@ -52,7 +52,7 @@ Depois clique em **Conectar**.
 
 ## Segurança
 
-O token não é salvo em Assets, ProjectSettings, package files ou Git. Nesta versão ele fica em `SessionState` e é descartado quando o Unity Editor é encerrado.
+O token não é salvo em Assets, ProjectSettings, package files ou Git. Ele é persistido localmente em `EditorPrefs` (registro do Windows / plist no macOS), de forma ofuscada, para que não seja necessário reinformá-lo a cada vez que o Unity Editor é aberto. A ofuscação evita que o valor fique em texto puro, mas **não** é criptografia forte.
 
 Para uma distribuição corporativa definitiva, considere substituir `JiraBasicTokenAuthProvider` por OAuth 2.0 ou por armazenamento no cofre de credenciais do sistema operacional.
 
