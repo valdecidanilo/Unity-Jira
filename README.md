@@ -5,7 +5,7 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 ## Recursos incluídos
 
 - Menu superior `Jira` com logo oficial na janela e no ícone da aba.
-- Janela `Jira > Open Jira Workspace` construída com UI Toolkit, dividida em duas abas: **Conexão** e **Criar Issue**.
+- Janela `Jira > Jira Workspace` construída com UI Toolkit e abas para conexão, criação, atividades e configurações.
 - Campos para URL do Jira, e-mail Atlassian e API Token.
 - Teste real de conexão usando `GET /rest/api/3/myself`.
 - Aba **Criar Issue** com criação de história, tarefa, bug e subtask, em seções organizadas:
@@ -34,7 +34,7 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 2. No Unity, abra `Window > Package Manager`.
 3. Clique em `+` e escolha `Add package from disk...`.
 4. Selecione o arquivo `package.json`.
-5. Abra `Jira > Open Jira Workspace`.
+5. Abra `Jira > Jira Workspace`.
 
 ### Dentro da pasta Packages
 
@@ -49,6 +49,28 @@ Informe:
 - API Token: token pessoal criado na Atlassian
 
 Depois clique em **Conectar**.
+
+## Status sincronizados por empresa
+
+Os filtros da aba **Atividades** não possuem nomes de status fixos no código.
+Ao conectar, o plugin consulta `GET /rest/api/3/status` e monta um dropdown
+compacto e pesquisável com os status disponíveis no Jira da empresa. Assim, um
+workflow sem `P/Teste`, por exemplo, não exibe essa opção.
+
+As cores também usam as categorias oficiais retornadas pela API: cinza para
+"A fazer", azul para "Em andamento" e verde para "Concluído". Essas mesmas
+categorias organizam os status em grupos dentro do dropdown, sem depender dos
+nomes escolhidos por cada empresa. O botão **Recarregar** da aba Atividades
+sincroniza novamente o catálogo remoto.
+
+A pesquisa local por chave ou título fica junto à lista de atividades e também
+encontra subtarefas carregadas.
+
+No menu `Jira` ficam disponíveis somente:
+
+- `Jira Workspace`
+- `Documentação oficial do Jira`
+- `Documentação do GitHub`
 
 ## Segurança
 

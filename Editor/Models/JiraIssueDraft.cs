@@ -15,8 +15,8 @@ namespace OxenteGames.JiraCommunication.Models
         public string Summary;
         public string Description;
 
-        // Parent issue key. Used for a subtask's parent, or as the epic parent
-        // on team-managed (next-gen) projects.
+        // Parent issue key. Jira uses this relationship for direct hierarchy
+        // children, including Epic children and subtasks.
         public string ParentKey;
 
         // fieldId -> raw JSON value (already serialized, e.g. {"id":"3"} or "2024-01-01").

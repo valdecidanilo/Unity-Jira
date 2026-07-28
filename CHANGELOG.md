@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 - 2026-07-28
+
+- Status da aba **Atividades** sincronizados dinamicamente com o Jira Cloud.
+- Removida a dependência de nomes de workflow específicos no código do package.
+- Catálogo e cores baseados exclusivamente nos dados retornados pela API do Jira.
+- Filtro de status compacto, pesquisável e agrupado pelas categorias oficiais do Jira.
+- Pesquisa por chave ou título movida para a lista de atividades, com exemplo de uso.
+- Menu simplificado para Workspace e links das documentações oficiais.
+- Edição de atividade com prioridade, peso/Story Points e criação de subtarefas vinculadas.
+- Busca de menções usando as mesmas pessoas atribuíveis retornadas pelo projeto.
+- Criação rápida de subtarefas compatível com tarefas, histórias, bugs e tipos equivalentes do Jira.
+
 ## 0.6.0 - 2026-07-27
 
 - Nova aba **Resolver**: lista suas issues em aberto e as reabertas.

@@ -150,6 +150,24 @@ namespace OxenteGames.JiraCommunication.API
             return fields;
         }
 
+        /// <summary>
+        /// Fields currently visible and editable for an existing issue.
+        /// Unlike create metadata, this also reflects the issue's edit screen.
+        /// </summary>
+        public async Task<List<JiraFieldMeta>> GetEditFieldsAsync(
+            string issueKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}/editmeta",
+                null);
+
+            ThrowIfFailed(
+                response,
+                "Não foi possível carregar os campos editáveis da atividade.");
+            return ParseFieldMap(response.Body);
+        }
+
         public async Task<List<JiraAllowedValue>> GetPrioritiesAsync()
         {
             JiraResponse response = await SendAsync(
@@ -162,6 +180,81 @@ namespace OxenteGames.JiraCommunication.API
 
             var page = JsonUtility.FromJson<JiraAllowedValuePage>(response.Body);
             return ToList(page?.values);
+        }
+
+        public async Task<List<JiraIssuePickerIssue>>
+            SearchIssuePickerAsync(
+                string query,
+                string currentProjectId)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<JiraIssuePickerIssue>();
+
+            string path =
+                "/rest/api/3/issue/picker?query=" +
+                UnityWebRequest.EscapeURL(query.Trim());
+            if (!string.IsNullOrWhiteSpace(currentProjectId))
+            {
+                path += "&currentProjectId=" +
+                        UnityWebRequest.EscapeURL(currentProjectId);
+            }
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                path,
+                null);
+            ThrowIfFailed(
+                response,
+                "Não foi possível pesquisar itens associados.");
+
+            var picker = JsonUtility.FromJson<JiraIssuePickerResponse>(
+                response.Body);
+            var results = new List<JiraIssuePickerIssue>();
+            var keys = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+            if (picker?.sections == null)
+                return results;
+
+            foreach (JiraIssuePickerSection section in picker.sections)
+            {
+                if (section?.issues == null)
+                    continue;
+
+                foreach (JiraIssuePickerIssue issue in section.issues)
+                {
+                    if (issue == null ||
+                        string.IsNullOrWhiteSpace(issue.key) ||
+                        !keys.Add(issue.key))
+                    {
+                        continue;
+                    }
+
+                    results.Add(issue);
+                    if (results.Count >= 12)
+                        return results;
+                }
+            }
+
+            return results;
+        }
+
+        public async Task<List<JiraWorkflowStatus>> GetStatusesAsync()
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                "/rest/api/3/status",
+                null);
+
+            ThrowIfFailed(
+                response,
+                "Não foi possível sincronizar os status configurados no Jira.");
+
+            if (string.IsNullOrWhiteSpace(response.Body))
+                return new List<JiraWorkflowStatus>();
+
+            var wrapped = JsonUtility.FromJson<JiraWorkflowStatusList>(
+                "{\"items\":" + response.Body + "}");
+            return ToList(wrapped?.items);
         }
 
         public async Task<List<JiraUser>> GetAssignableUsersAsync(string projectKey)
@@ -217,6 +310,60 @@ namespace OxenteGames.JiraCommunication.API
             return users;
         }
 
+        public async Task<List<JiraUser>> SearchAssignableUsersAsync(
+            string projectKey,
+            string query)
+        {
+            if (string.IsNullOrWhiteSpace(projectKey) ||
+                string.IsNullOrWhiteSpace(query))
+            {
+                return new List<JiraUser>();
+            }
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                "/rest/api/3/user/assignable/search" +
+                "?project=" +
+                UnityWebRequest.EscapeURL(projectKey) +
+                "&query=" +
+                UnityWebRequest.EscapeURL(query.Trim()) +
+                "&startAt=0&maxResults=100",
+                null);
+            return ParseUserArray(response);
+        }
+
+        public async Task<List<JiraUser>> SearchUserPickerAsync(
+            string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<JiraUser>();
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                "/rest/api/3/user/picker?query=" +
+                UnityWebRequest.EscapeURL(query.Trim()) +
+                "&maxResults=50&showAvatar=false" +
+                "&excludeConnectUsers=true",
+                null);
+            if (!response.Success ||
+                string.IsNullOrWhiteSpace(response.Body))
+            {
+                return new List<JiraUser>();
+            }
+
+            try
+            {
+                var picker =
+                    JsonUtility.FromJson<JiraUserPickerResponse>(
+                        response.Body);
+                return ToList(picker?.users);
+            }
+            catch
+            {
+                return new List<JiraUser>();
+            }
+        }
+
         public async Task<List<JiraBoard>> GetBoardsAsync(string projectKey)
         {
             JiraResponse response = await SendAsync(
@@ -231,18 +378,48 @@ namespace OxenteGames.JiraCommunication.API
             return ToList(page?.values);
         }
 
-        public async Task<List<JiraSprint>> GetActiveSprintsAsync(int boardId)
+        public async Task<List<JiraSprint>> GetAvailableSprintsAsync(
+            int boardId)
         {
-            JiraResponse response = await SendAsync(
-                UnityWebRequest.kHttpVerbGET,
-                $"/rest/agile/1.0/board/{boardId}/sprint?state=active&maxResults=50",
-                null);
+            var sprints = new List<JiraSprint>();
+            var ids = new HashSet<int>();
+            const int pageSize = 100;
+            int startAt = 0;
 
-            if (!response.Success)
-                return new List<JiraSprint>();
+            while (startAt < 2000)
+            {
+                JiraResponse response = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    $"/rest/agile/1.0/board/{boardId}/sprint" +
+                    "?state=active,future" +
+                    $"&startAt={startAt}&maxResults={pageSize}",
+                    null);
 
-            var page = JsonUtility.FromJson<JiraSprintPage>(response.Body);
-            return ToList(page?.values);
+                if (!response.Success)
+                    break;
+
+                var page = JsonUtility.FromJson<JiraSprintPage>(
+                    response.Body);
+                JiraSprint[] values = page?.values;
+                if (values == null || values.Length == 0)
+                    break;
+
+                foreach (JiraSprint sprint in values)
+                {
+                    if (sprint != null && ids.Add(sprint.id))
+                        sprints.Add(sprint);
+                }
+
+                startAt += values.Length;
+                if (page.isLast ||
+                    values.Length < pageSize ||
+                    (page.total > 0 && startAt >= page.total))
+                {
+                    break;
+                }
+            }
+
+            return sprints;
         }
 
         public async Task<List<JiraEpic>> GetEpicsAsync(int boardId)
@@ -403,12 +580,34 @@ namespace OxenteGames.JiraCommunication.API
         /// <summary>Uploads a file to an issue. Returns null on success or an error message.</summary>
         public async Task<string> UploadAttachmentAsync(string issueKey, string filePath)
         {
+            JiraAttachmentUploadResult result =
+                await UploadAttachmentWithResultAsync(issueKey, filePath);
+            return result.Error;
+        }
+
+        public async Task<JiraAttachmentUploadResult>
+            UploadAttachmentWithResultAsync(
+                string issueKey,
+                string filePath)
+        {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
-                return "Arquivo de anexo não encontrado.";
+            {
+                return new JiraAttachmentUploadResult
+                {
+                    Error = "Arquivo de anexo não encontrado."
+                };
+            }
 
             byte[] bytes;
             try { bytes = File.ReadAllBytes(filePath); }
-            catch (Exception exception) { return $"Não foi possível ler o anexo: {exception.Message}"; }
+            catch (Exception exception)
+            {
+                return new JiraAttachmentUploadResult
+                {
+                    Error =
+                        $"Não foi possível ler o anexo: {exception.Message}"
+                };
+            }
 
             string fileName = Path.GetFileName(filePath);
             var form = new List<IMultipartFormSection>
@@ -421,7 +620,28 @@ namespace OxenteGames.JiraCommunication.API
             request.SetRequestHeader("X-Atlassian-Token", "no-check");
 
             JiraResponse response = await AwaitRequest(request);
-            return response.Success ? null : BuildIssueError(response);
+            if (!response.Success)
+            {
+                return new JiraAttachmentUploadResult
+                {
+                    Error = BuildIssueError(response)
+                };
+            }
+
+            JiraAttachmentInfo attachment = null;
+            if (!string.IsNullOrWhiteSpace(response.Body))
+            {
+                string wrapped = "{\"items\":" + response.Body + "}";
+                JiraAttachmentInfoList list =
+                    JsonUtility.FromJson<JiraAttachmentInfoList>(wrapped);
+                if (list?.items != null && list.items.Length > 0)
+                    attachment = list.items[0];
+            }
+
+            return new JiraAttachmentUploadResult
+            {
+                Attachment = attachment
+            };
         }
 
         // --- Resolve / conclude --------------------------------------------
@@ -429,15 +649,204 @@ namespace OxenteGames.JiraCommunication.API
         /// <summary>Runs a JQL search and returns the matching issues (summary + status).</summary>
         public async Task<List<JiraListIssue>> SearchIssuesAsync(string jql, int maxResults)
         {
+            int totalLimit = Mathf.Clamp(maxResults, 1, 1000);
+            int pageSize = Mathf.Min(100, totalLimit);
+            string nextPageToken = null;
+            var issues = new List<JiraListIssue>(Mathf.Min(totalLimit, 100));
+            int pageCount = 0;
+
+            do
+            {
+                string path =
+                    $"/rest/api/3/search/jql?jql={UnityWebRequest.EscapeURL(jql)}" +
+                    "&fields=summary,status,priority,issuetype,assignee,updated,subtasks" +
+                    $"&maxResults={pageSize}";
+                if (!string.IsNullOrWhiteSpace(nextPageToken))
+                {
+                    path += "&nextPageToken=" +
+                            UnityWebRequest.EscapeURL(nextPageToken);
+                }
+
+                JiraResponse response = await SendAsync(
+                    UnityWebRequest.kHttpVerbGET,
+                    path,
+                    null);
+
+                ThrowIfFailed(response, "Não foi possível carregar as issues.");
+                var page = JsonUtility.FromJson<JiraListSearchPage>(response.Body);
+                if (page?.issues != null)
+                {
+                    foreach (JiraListIssue issue in page.issues)
+                    {
+                        if (issue != null)
+                            issues.Add(issue);
+                        if (issues.Count >= totalLimit)
+                            break;
+                    }
+                }
+
+                nextPageToken = page?.nextPageToken;
+                pageCount++;
+            }
+            while (issues.Count < totalLimit &&
+                   !string.IsNullOrWhiteSpace(nextPageToken) &&
+                   pageCount < 20);
+
+            return issues;
+        }
+
+        /// <summary>
+        /// Loads the direct children of an issue. Jira uses the same parent
+        /// relationship for Epic children and for subtasks.
+        /// </summary>
+        public Task<List<JiraListIssue>> GetDirectChildIssuesAsync(
+            string parentKey,
+            int maxResults = 200)
+        {
+            if (string.IsNullOrWhiteSpace(parentKey))
+            {
+                return Task.FromResult(new List<JiraListIssue>());
+            }
+
+            string jql =
+                $"parent = \"{EscapeJqlString(parentKey.Trim())}\" " +
+                "ORDER BY created ASC";
+            return SearchIssuesAsync(jql, maxResults);
+        }
+
+        /// <summary>Loads the fields that can be edited from the Resolver panel.</summary>
+        public async Task<JiraIssueEditResponse> GetIssueForEditAsync(
+            string issueKey,
+            string weightFieldId = null,
+            string teamFieldId = null)
+        {
+            string fields = "summary,description,subtasks,priority,issuetype";
+            if (!string.IsNullOrWhiteSpace(weightFieldId))
+                fields += "," + weightFieldId;
+            if (!string.IsNullOrWhiteSpace(teamFieldId) &&
+                !string.Equals(
+                    teamFieldId,
+                    weightFieldId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                fields += "," + teamFieldId;
+            }
+
             JiraResponse response = await SendAsync(
                 UnityWebRequest.kHttpVerbGET,
-                $"/rest/api/3/search/jql?jql={UnityWebRequest.EscapeURL(jql)}" +
-                $"&fields=summary,status,assignee,updated&maxResults={maxResults}",
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}" +
+                "?fields=" + UnityWebRequest.EscapeURL(fields),
                 null);
 
-            ThrowIfFailed(response, "Não foi possível carregar as issues.");
-            var page = JsonUtility.FromJson<JiraListSearchPage>(response.Body);
-            return ToList(page?.issues);
+            ThrowIfFailed(response, "Não foi possível carregar os dados da atividade.");
+            JiraIssueEditResponse issue =
+                JsonUtility.FromJson<JiraIssueEditResponse>(response.Body);
+            if (issue != null && !string.IsNullOrWhiteSpace(weightFieldId))
+            {
+                issue.weightValue = ExtractJsonPrimitive(
+                    response.Body,
+                    weightFieldId);
+            }
+            if (issue != null && !string.IsNullOrWhiteSpace(teamFieldId))
+            {
+                issue.teamValue = ExtractJsonFieldIdentifier(
+                    response.Body,
+                    teamFieldId);
+            }
+            return issue;
+        }
+
+        /// <summary>Updates summary and description. Returns null on success.</summary>
+        public async Task<string> UpdateIssueAsync(
+            string issueKey,
+            string summary,
+            string description,
+            bool updateSummary,
+            bool updateDescription)
+        {
+            var body = new StringBuilder(256);
+            body.Append("{\"fields\":{");
+            bool wroteField = false;
+            if (updateSummary)
+            {
+                body.Append("\"summary\":\"")
+                    .Append(JiraIssueDraft.JsonEscape(summary ?? string.Empty))
+                    .Append('"');
+                wroteField = true;
+            }
+            if (updateDescription)
+            {
+                if (wroteField)
+                    body.Append(',');
+                body.Append("\"description\":")
+                    .Append(JiraAdf.BuildTextDocument(description ?? string.Empty));
+            }
+            body.Append("}}");
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPUT,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}",
+                body.ToString());
+
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        public async Task<string> UpdateIssueDescriptionAdfAsync(
+            string issueKey,
+            string descriptionAdf)
+        {
+            if (string.IsNullOrWhiteSpace(descriptionAdf))
+                return "A descrição em ADF está vazia.";
+
+            string body =
+                "{\"fields\":{\"description\":" +
+                descriptionAdf +
+                "}}";
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPUT,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}",
+                body);
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        /// <summary>Changes only the issue priority. Returns null on success.</summary>
+        public async Task<string> UpdateIssuePriorityAsync(string issueKey, string priorityId)
+        {
+            string body =
+                "{\"fields\":{\"priority\":{\"id\":\"" +
+                JiraIssueDraft.JsonEscape(priorityId ?? string.Empty) +
+                "\"}}}";
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPUT,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}",
+                body);
+
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        public async Task<string> UpdateIssueNumberAsync(
+            string issueKey,
+            string fieldId,
+            string invariantValue)
+        {
+            if (string.IsNullOrWhiteSpace(fieldId))
+                return null;
+
+            string value = string.IsNullOrWhiteSpace(invariantValue)
+                ? "null"
+                : invariantValue;
+            string body =
+                "{\"fields\":{\"" +
+                JiraIssueDraft.JsonEscape(fieldId) +
+                "\":" + value + "}}";
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPUT,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}",
+                body);
+
+            return response.Success ? null : BuildIssueError(response);
         }
 
         /// <summary>Available workflow transitions for an issue.</summary>
@@ -598,6 +1007,312 @@ namespace OxenteGames.JiraCommunication.API
             return string.IsNullOrEmpty(response.Error)
                 ? $"Falha HTTP {response.StatusCode}."
                 : response.Error;
+        }
+
+        private static string ExtractJsonPrimitive(
+            string json,
+            string fieldId)
+        {
+            if (string.IsNullOrWhiteSpace(json) ||
+                string.IsNullOrWhiteSpace(fieldId))
+            {
+                return string.Empty;
+            }
+
+            string token = "\"" + fieldId + "\"";
+            int fieldIndex = json.IndexOf(token, StringComparison.Ordinal);
+            if (fieldIndex < 0)
+                return string.Empty;
+
+            int colon = json.IndexOf(':', fieldIndex + token.Length);
+            if (colon < 0)
+                return string.Empty;
+
+            int start = colon + 1;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+
+            if (start >= json.Length ||
+                json.IndexOf("null", start, StringComparison.Ordinal) == start)
+            {
+                return string.Empty;
+            }
+
+            int end = start;
+            while (end < json.Length &&
+                   json[end] != ',' &&
+                   json[end] != '}' &&
+                   !char.IsWhiteSpace(json[end]))
+            {
+                end++;
+            }
+
+            return json.Substring(start, end - start).Trim('"');
+        }
+
+        private static string ExtractJsonFieldIdentifier(
+            string json,
+            string fieldId)
+        {
+            if (string.IsNullOrWhiteSpace(json) ||
+                string.IsNullOrWhiteSpace(fieldId))
+            {
+                return string.Empty;
+            }
+
+            string token = "\"" + fieldId + "\"";
+            int fieldIndex = json.IndexOf(token, StringComparison.Ordinal);
+            if (fieldIndex < 0)
+                return string.Empty;
+
+            int colon = json.IndexOf(':', fieldIndex + token.Length);
+            if (colon < 0)
+                return string.Empty;
+
+            int start = colon + 1;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+                start++;
+
+            if (start >= json.Length || json[start] != '{')
+                return ExtractJsonPrimitive(json, fieldId);
+
+            int objectEnd = json.IndexOf('}', start + 1);
+            if (objectEnd < 0)
+                return string.Empty;
+
+            string objectJson =
+                json.Substring(start, objectEnd - start + 1);
+            return ExtractJsonPrimitive(objectJson, "id");
+        }
+
+        private static List<JiraFieldMeta> ParseFieldMap(string json)
+        {
+            var fields = new List<JiraFieldMeta>();
+            if (string.IsNullOrWhiteSpace(json))
+                return fields;
+
+            int fieldsToken = json.IndexOf(
+                "\"fields\"",
+                StringComparison.Ordinal);
+            if (fieldsToken < 0)
+                return fields;
+
+            int objectStart = json.IndexOf('{', fieldsToken + 8);
+            int objectEnd = FindMatchingJsonDelimiter(
+                json,
+                objectStart,
+                '{',
+                '}');
+            if (objectStart < 0 || objectEnd < 0)
+                return fields;
+
+            int cursor = objectStart + 1;
+            while (cursor < objectEnd)
+            {
+                SkipJsonWhitespaceAndCommas(json, ref cursor, objectEnd);
+                if (cursor >= objectEnd || json[cursor] != '"')
+                    break;
+
+                int keyStart = ++cursor;
+                while (cursor < objectEnd)
+                {
+                    if (json[cursor] == '\\')
+                    {
+                        cursor += 2;
+                        continue;
+                    }
+                    if (json[cursor] == '"')
+                        break;
+                    cursor++;
+                }
+                if (cursor >= objectEnd)
+                    break;
+
+                string fieldId = json.Substring(
+                    keyStart,
+                    cursor - keyStart);
+                cursor++;
+                SkipJsonWhitespace(json, ref cursor, objectEnd);
+                if (cursor >= objectEnd || json[cursor] != ':')
+                    break;
+
+                cursor++;
+                SkipJsonWhitespace(json, ref cursor, objectEnd);
+                if (cursor >= objectEnd || json[cursor] != '{')
+                {
+                    SkipJsonValue(json, ref cursor, objectEnd);
+                    continue;
+                }
+
+                int fieldEnd = FindMatchingJsonDelimiter(
+                    json,
+                    cursor,
+                    '{',
+                    '}');
+                if (fieldEnd < 0 || fieldEnd > objectEnd)
+                    break;
+
+                string fieldObject = json.Substring(
+                    cursor,
+                    fieldEnd - cursor + 1);
+                string fieldContent = fieldObject.Length > 2
+                    ? fieldObject.Substring(1, fieldObject.Length - 2).Trim()
+                    : string.Empty;
+                string enriched =
+                    "{\"fieldId\":\"" +
+                    JiraIssueDraft.JsonEscape(fieldId) +
+                    "\"" +
+                    (fieldContent.Length > 0
+                        ? "," + fieldContent
+                        : string.Empty) +
+                    "}";
+
+                try
+                {
+                    JiraFieldMeta field =
+                        JsonUtility.FromJson<JiraFieldMeta>(enriched);
+                    if (field != null)
+                        fields.Add(field);
+                }
+                catch
+                {
+                    // Ignore an unsupported field and keep the remaining ones.
+                }
+
+                cursor = fieldEnd + 1;
+            }
+
+            return fields;
+        }
+
+        private static int FindMatchingJsonDelimiter(
+            string json,
+            int start,
+            char opening,
+            char closing)
+        {
+            if (string.IsNullOrEmpty(json) ||
+                start < 0 ||
+                start >= json.Length ||
+                json[start] != opening)
+            {
+                return -1;
+            }
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+            for (int i = start; i < json.Length; i++)
+            {
+                char character = json[i];
+                if (inString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (character == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (character == '"')
+                    {
+                        inString = false;
+                    }
+                    continue;
+                }
+
+                if (character == '"')
+                {
+                    inString = true;
+                }
+                else if (character == opening)
+                {
+                    depth++;
+                }
+                else if (character == closing && --depth == 0)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static void SkipJsonWhitespace(
+            string json,
+            ref int cursor,
+            int end)
+        {
+            while (cursor < end && char.IsWhiteSpace(json[cursor]))
+                cursor++;
+        }
+
+        private static void SkipJsonWhitespaceAndCommas(
+            string json,
+            ref int cursor,
+            int end)
+        {
+            while (cursor < end &&
+                   (char.IsWhiteSpace(json[cursor]) ||
+                    json[cursor] == ','))
+            {
+                cursor++;
+            }
+        }
+
+        private static List<JiraUser> ParseUserArray(
+            JiraResponse response)
+        {
+            if (response == null ||
+                !response.Success ||
+                string.IsNullOrWhiteSpace(response.Body))
+            {
+                return new List<JiraUser>();
+            }
+
+            try
+            {
+                var wrapped = JsonUtility.FromJson<JiraUserList>(
+                    "{\"items\":" + response.Body + "}");
+                return ToList(wrapped?.items);
+            }
+            catch
+            {
+                return new List<JiraUser>();
+            }
+        }
+
+        private static void SkipJsonValue(
+            string json,
+            ref int cursor,
+            int end)
+        {
+            bool inString = false;
+            bool escaped = false;
+            while (cursor < end)
+            {
+                char character = json[cursor];
+                if (inString)
+                {
+                    if (escaped)
+                        escaped = false;
+                    else if (character == '\\')
+                        escaped = true;
+                    else if (character == '"')
+                        inString = false;
+                }
+                else if (character == '"')
+                {
+                    inString = true;
+                }
+                else if (character == ',')
+                {
+                    return;
+                }
+
+                cursor++;
+            }
         }
 
         private static string ExtractJiraErrors(string body)

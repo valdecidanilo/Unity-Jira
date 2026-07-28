@@ -110,6 +110,7 @@ namespace OxenteGames.JiraCommunication.UI
         {
             field.style.marginBottom = 10;
             field.style.color = TextPrimary;
+            field.labelElement.enableRichText = true;
         }
 
         public static void ApplyPrimaryButton(Button button)
@@ -169,6 +170,38 @@ namespace OxenteGames.JiraCommunication.UI
             label.style.whiteSpace = WhiteSpace.Normal;
         }
 
+        public static void ApplyLoaderRow(VisualElement row)
+        {
+            row.style.minHeight = 46;
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.paddingLeft = 12;
+            row.style.paddingRight = 12;
+            row.style.paddingTop = 8;
+            row.style.paddingBottom = 8;
+            row.style.backgroundColor = SurfaceRaised;
+            row.style.borderTopLeftRadius = 6;
+            row.style.borderTopRightRadius = 6;
+            row.style.borderBottomLeftRadius = 6;
+            row.style.borderBottomRightRadius = 6;
+            row.style.borderLeftWidth = 1;
+            row.style.borderRightWidth = 1;
+            row.style.borderTopWidth = 1;
+            row.style.borderBottomWidth = 1;
+            row.style.borderLeftColor = Border;
+            row.style.borderRightColor = Border;
+            row.style.borderTopColor = Border;
+            row.style.borderBottomColor = Border;
+        }
+
+        public static void ApplyLoaderSpinner(VisualElement spinner)
+        {
+            spinner.style.width = 18;
+            spinner.style.minWidth = 18;
+            spinner.style.height = 18;
+            spinner.style.flexShrink = 0;
+        }
+
         public static void ApplyTabBar(VisualElement bar)
         {
             SetFixedHeight(bar, TabBarHeight);
@@ -216,11 +249,201 @@ namespace OxenteGames.JiraCommunication.UI
         {
             dropdown.style.marginBottom = 10;
             dropdown.style.color = TextPrimary;
+            dropdown.labelElement.enableRichText = true;
+            dropdown.labelElement.style.color = TextSecondary;
+            dropdown.labelElement.style.marginBottom = 5;
+            dropdown.labelElement.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+            ApplyDropdownParts(dropdown);
+            dropdown.RegisterCallback<AttachToPanelEvent>(_ => ApplyDropdownParts(dropdown));
+        }
+
+        private static void ApplyDropdownParts(DropdownField dropdown)
+        {
+            VisualElement input = dropdown.Q<VisualElement>(
+                className: "unity-base-popup-field__input");
+            if (input != null)
+            {
+                input.style.height = 30;
+                input.style.minHeight = 30;
+                input.style.backgroundColor = SurfaceRaised;
+                input.style.borderLeftWidth = 1;
+                input.style.borderRightWidth = 1;
+                input.style.borderTopWidth = 1;
+                input.style.borderBottomWidth = 1;
+                input.style.borderLeftColor = Border;
+                input.style.borderRightColor = Border;
+                input.style.borderTopColor = Border;
+                input.style.borderBottomColor = Border;
+                input.style.borderTopLeftRadius = 6;
+                input.style.borderTopRightRadius = 6;
+                input.style.borderBottomLeftRadius = 6;
+                input.style.borderBottomRightRadius = 6;
+                input.style.paddingLeft = 10;
+                input.style.paddingRight = 8;
+            }
+
+            TextElement text = dropdown.Q<TextElement>(
+                className: "unity-base-popup-field__text");
+            if (text != null)
+            {
+                text.style.color = TextPrimary;
+                text.style.fontSize = 11;
+            }
+
+            VisualElement arrow = dropdown.Q<VisualElement>(
+                className: "unity-base-popup-field__arrow");
+            if (arrow != null)
+                arrow.style.unityBackgroundImageTintColor = Accent;
+        }
+
+        public static void ApplyDropdownPopup(VisualElement popup)
+        {
+            popup.style.position = Position.Absolute;
+            popup.style.backgroundColor = new StyleColor(new Color32(35, 39, 46, 255));
+            popup.style.paddingLeft = 8;
+            popup.style.paddingRight = 8;
+            popup.style.paddingTop = 8;
+            popup.style.paddingBottom = 8;
+            popup.style.borderLeftWidth = 1;
+            popup.style.borderRightWidth = 1;
+            popup.style.borderTopWidth = 1;
+            popup.style.borderBottomWidth = 1;
+            popup.style.borderLeftColor = new Color(Accent.r, Accent.g, Accent.b, 0.65f);
+            popup.style.borderRightColor = new Color(Accent.r, Accent.g, Accent.b, 0.65f);
+            popup.style.borderTopColor = new Color(Accent.r, Accent.g, Accent.b, 0.65f);
+            popup.style.borderBottomColor = new Color(Accent.r, Accent.g, Accent.b, 0.65f);
+            popup.style.borderTopLeftRadius = 8;
+            popup.style.borderTopRightRadius = 8;
+            popup.style.borderBottomLeftRadius = 8;
+            popup.style.borderBottomRightRadius = 8;
+        }
+
+        public static void ApplyDropdownPopupCaption(Label label)
+        {
+            label.style.color = TextSecondary;
+            label.style.fontSize = 10;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.marginLeft = 8;
+            label.style.marginTop = 2;
+            label.style.marginBottom = 3;
+        }
+
+        public static void ApplyDropdownPopupCurrent(Label label, StyleColor accent)
+        {
+            label.style.height = 28;
+            label.style.unityTextAlign = TextAnchor.MiddleLeft;
+            label.style.paddingLeft = 8;
+            label.style.paddingRight = 8;
+            label.style.backgroundColor = SurfaceRaised;
+            label.style.color = accent;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.borderTopLeftRadius = 5;
+            label.style.borderTopRightRadius = 5;
+            label.style.borderBottomLeftRadius = 5;
+            label.style.borderBottomRightRadius = 5;
+        }
+
+        public static void ApplyDropdownPopupDivider(VisualElement divider)
+        {
+            divider.style.height = 1;
+            divider.style.backgroundColor = Border;
+            divider.style.marginTop = 7;
+            divider.style.marginBottom = 7;
+        }
+
+        public static void ApplyDropdownPopupItem(Button button)
+        {
+            button.style.height = 32;
+            button.style.marginBottom = 2;
+            button.style.paddingLeft = 10;
+            button.style.paddingRight = 10;
+            button.style.unityTextAlign = TextAnchor.MiddleLeft;
+            button.style.fontSize = 11;
+            button.style.color = TextPrimary;
+            button.style.backgroundColor = Color.clear;
+            button.style.borderLeftWidth = 0;
+            button.style.borderRightWidth = 0;
+            button.style.borderTopWidth = 0;
+            button.style.borderBottomWidth = 0;
+            button.style.borderTopLeftRadius = 5;
+            button.style.borderTopRightRadius = 5;
+            button.style.borderBottomLeftRadius = 5;
+            button.style.borderBottomRightRadius = 5;
+            button.RegisterCallback<PointerEnterEvent>(_ =>
+                button.style.backgroundColor = new Color(Accent.r, Accent.g, Accent.b, 0.2f));
+            button.RegisterCallback<PointerLeaveEvent>(_ =>
+                button.style.backgroundColor = Color.clear);
+        }
+
+        public static void ApplyDropdownPopupEmpty(Label label)
+        {
+            label.style.paddingLeft = 10;
+            label.style.paddingRight = 10;
+            label.style.paddingTop = 9;
+            label.style.paddingBottom = 9;
+            label.style.color = TextSecondary;
+            label.style.fontSize = 11;
+            label.style.whiteSpace = WhiteSpace.Normal;
+        }
+
+        public static void ApplyCloseButton(Button button)
+        {
+            button.style.width = 28;
+            button.style.minWidth = 28;
+            button.style.height = 28;
+            button.style.paddingLeft = 0;
+            button.style.paddingRight = 0;
+            button.style.marginLeft = 10;
+            button.style.backgroundColor = new Color(Danger.r, Danger.g, Danger.b, 0.12f);
+            button.style.color = Danger;
+            button.style.fontSize = 17;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.borderLeftWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            Color closeBorder = new Color(Danger.r, Danger.g, Danger.b, 0.45f);
+            button.style.borderLeftColor = closeBorder;
+            button.style.borderRightColor = closeBorder;
+            button.style.borderTopColor = closeBorder;
+            button.style.borderBottomColor = closeBorder;
+            button.style.borderTopLeftRadius = 6;
+            button.style.borderTopRightRadius = 6;
+            button.style.borderBottomLeftRadius = 6;
+            button.style.borderBottomRightRadius = 6;
+        }
+
+        public static void ApplyPriorityButton(Button button)
+        {
+            button.style.width = 30;
+            button.style.minWidth = 30;
+            button.style.height = 26;
+            button.style.paddingLeft = 4;
+            button.style.paddingRight = 4;
+            button.style.marginLeft = 7;
+            button.style.marginRight = 7;
+            button.style.alignItems = Align.Center;
+            button.style.justifyContent = Justify.Center;
+            button.style.backgroundColor = SurfaceRaised;
+            button.style.borderLeftWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            button.style.borderLeftColor = Border;
+            button.style.borderRightColor = Border;
+            button.style.borderTopColor = Border;
+            button.style.borderBottomColor = Border;
+            button.style.borderTopLeftRadius = 5;
+            button.style.borderTopRightRadius = 5;
+            button.style.borderBottomLeftRadius = 5;
+            button.style.borderBottomRightRadius = 5;
         }
 
         public static void ApplyMultiline(TextField field)
         {
             field.multiline = true;
+            field.labelElement.enableRichText = true;
             field.style.flexDirection = FlexDirection.Column;
             field.style.marginBottom = 10;
             field.style.minHeight = 84;
@@ -258,6 +481,7 @@ namespace OxenteGames.JiraCommunication.UI
 
         public static void ApplyDynamicFieldLabel(Label label)
         {
+            label.enableRichText = true;
             label.style.color = TextPrimary;
             label.style.fontSize = 12;
             label.style.marginBottom = 5;

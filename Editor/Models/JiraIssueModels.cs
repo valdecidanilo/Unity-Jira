@@ -76,6 +76,10 @@ namespace OxenteGames.JiraCommunication.Models
     internal sealed class JiraSprintPage
     {
         public JiraSprint[] values;
+        public int startAt;
+        public int maxResults;
+        public int total;
+        public bool isLast;
     }
 
     [Serializable]
@@ -126,6 +130,36 @@ namespace OxenteGames.JiraCommunication.Models
         public string id;
         public string key;
         public string self;
+    }
+
+    [Serializable]
+    internal sealed class JiraAttachmentInfo
+    {
+        public string id;
+        public string filename;
+        public string content;
+        public string mimeType;
+        public string thumbnail;
+
+        public bool IsImage =>
+            !string.IsNullOrWhiteSpace(mimeType) &&
+            mimeType.StartsWith(
+                "image/",
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Serializable]
+    internal sealed class JiraAttachmentInfoList
+    {
+        public JiraAttachmentInfo[] items;
+    }
+
+    internal sealed class JiraAttachmentUploadResult
+    {
+        public JiraAttachmentInfo Attachment;
+        public string Error;
+
+        public bool Success => string.IsNullOrWhiteSpace(Error);
     }
 
     [Serializable]
@@ -196,12 +230,44 @@ namespace OxenteGames.JiraCommunication.Models
         public JiraAllowedValue[] values;
     }
 
+    [Serializable]
+    internal sealed class JiraIssuePickerResponse
+    {
+        public JiraIssuePickerSection[] sections;
+    }
+
+    [Serializable]
+    internal sealed class JiraIssuePickerSection
+    {
+        public JiraIssuePickerIssue[] issues;
+    }
+
+    [Serializable]
+    internal sealed class JiraIssuePickerIssue
+    {
+        public long id;
+        public string key;
+        public string summary;
+        public string summaryText;
+
+        public string DisplaySummary =>
+            !string.IsNullOrWhiteSpace(summaryText)
+                ? summaryText
+                : summary;
+    }
+
     // Wrapper so JsonUtility can read the top-level array returned by
     // GET /rest/api/3/user/assignable/search.
     [Serializable]
     internal sealed class JiraUserList
     {
         public JiraUser[] items;
+    }
+
+    [Serializable]
+    internal sealed class JiraUserPickerResponse
+    {
+        public JiraUser[] users;
     }
 
     // --- Epic progress (child issues by status) ---
@@ -211,6 +277,23 @@ namespace OxenteGames.JiraCommunication.Models
     {
         public string key;   // "new" | "indeterminate" | "done"
         public string name;
+        public string colorName;
+    }
+
+    [Serializable]
+    internal sealed class JiraWorkflowStatus
+    {
+        public string id;
+        public string name;
+        public JiraStatusCategoryRef statusCategory;
+    }
+
+    // Wrapper so JsonUtility can read the top-level array returned by
+    // GET /rest/api/3/status.
+    [Serializable]
+    internal sealed class JiraWorkflowStatusList
+    {
+        public JiraWorkflowStatus[] items;
     }
 
     [Serializable]
