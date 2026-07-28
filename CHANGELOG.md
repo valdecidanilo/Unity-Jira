@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 - 2026-07-27
+
+- Nova aba **Resolver**: lista suas issues em aberto e as reabertas.
+- **Fixar** issues (pin) para mantê-las no topo da lista.
+- **Transições** do workflow da empresa por issue, aplicadas de dentro do Unity.
+- **Comentar** e **anexar** o print/arquivo do fix junto da resolução.
+- **Mencionar pessoas** (@) no comentário, com busca de usuários.
+- Campo de **responsável** melhorado: resultados clicáveis aparecem inline conforme você digita (sem precisar abrir o dropdown).
+
 ## 0.5.0 - 2026-07-27
 
 - Suporte a **ChatGPT (OpenAI)** além do Claude, com seletor de provedor nas Configurações (token e modelo por provedor).

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 
 namespace OxenteGames.JiraCommunication.Settings
@@ -5,6 +6,7 @@ namespace OxenteGames.JiraCommunication.Settings
     internal static class JiraPreferences
     {
         private const string BaseKey = "OxenteGames.JiraCommunication.";
+        private const string PinnedIssuesKey = BaseKey + "Resolve.Pinned";
         private const string BaseUrlKey = BaseKey + "BaseUrl";
         private const string EmailKey = BaseKey + "Email";
         private const string TokenSessionKey = BaseKey + "Token.Session";
@@ -126,6 +128,42 @@ namespace OxenteGames.JiraCommunication.Settings
             EditorPrefs.DeleteKey(PresetPriorityKey);
             EditorPrefs.DeleteKey(PresetAssigneeKey);
             EditorPrefs.DeleteKey(PresetTeamKey);
+        }
+
+        // --- Pinned issues (Resolve tab) ---
+
+        public static List<string> GetPinnedIssues()
+        {
+            string raw = EditorPrefs.GetString(PinnedIssuesKey, string.Empty);
+            var list = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw))
+                return list;
+
+            foreach (string key in raw.Split(','))
+            {
+                string trimmed = key.Trim();
+                if (trimmed.Length > 0 && !list.Contains(trimmed))
+                    list.Add(trimmed);
+            }
+
+            return list;
+        }
+
+        public static bool IsIssuePinned(string issueKey)
+        {
+            return GetPinnedIssues().Contains(issueKey);
+        }
+
+        public static void ToggleIssuePinned(string issueKey)
+        {
+            if (string.IsNullOrWhiteSpace(issueKey))
+                return;
+
+            List<string> pinned = GetPinnedIssues();
+            if (!pinned.Remove(issueKey))
+                pinned.Insert(0, issueKey);
+
+            EditorPrefs.SetString(PinnedIssuesKey, string.Join(",", pinned));
         }
     }
 }

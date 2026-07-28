@@ -424,6 +424,91 @@ namespace OxenteGames.JiraCommunication.API
             return response.Success ? null : BuildIssueError(response);
         }
 
+        // --- Resolve / conclude --------------------------------------------
+
+        /// <summary>Runs a JQL search and returns the matching issues (summary + status).</summary>
+        public async Task<List<JiraListIssue>> SearchIssuesAsync(string jql, int maxResults)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/search/jql?jql={UnityWebRequest.EscapeURL(jql)}" +
+                $"&fields=summary,status,assignee,updated&maxResults={maxResults}",
+                null);
+
+            ThrowIfFailed(response, "Não foi possível carregar as issues.");
+            var page = JsonUtility.FromJson<JiraListSearchPage>(response.Body);
+            return ToList(page?.issues);
+        }
+
+        /// <summary>Available workflow transitions for an issue.</summary>
+        public async Task<List<JiraTransition>> GetTransitionsAsync(string issueKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}/transitions",
+                null);
+
+            if (!response.Success)
+                return new List<JiraTransition>();
+
+            var list = JsonUtility.FromJson<JiraTransitionList>(response.Body);
+            return ToList(list?.transitions);
+        }
+
+        /// <summary>
+        /// Applies a workflow transition, optionally attaching a comment (ADF body).
+        /// Returns null on success or a friendly error message.
+        /// </summary>
+        public async Task<string> ApplyTransitionAsync(string issueKey, string transitionId, string commentAdf)
+        {
+            var sb = new StringBuilder(128);
+            sb.Append("{\"transition\":{\"id\":\"").Append(JiraIssueDraft.JsonEscape(transitionId)).Append("\"}");
+            if (!string.IsNullOrWhiteSpace(commentAdf))
+                sb.Append(",\"update\":{\"comment\":[{\"add\":{\"body\":").Append(commentAdf).Append("}}]}");
+            sb.Append('}');
+
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPOST,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}/transitions",
+                sb.ToString());
+
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        /// <summary>Adds a comment (ADF body). Returns null on success or a friendly error.</summary>
+        public async Task<string> AddCommentAsync(string issueKey, string commentAdf)
+        {
+            string body = "{\"body\":" + commentAdf + "}";
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbPOST,
+                $"/rest/api/3/issue/{UnityWebRequest.EscapeURL(issueKey)}/comment",
+                body);
+
+            return response.Success ? null : BuildIssueError(response);
+        }
+
+        /// <summary>Searches users by display name / email (for @mentions).</summary>
+        public async Task<List<JiraUser>> SearchUsersAsync(string query)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/user/search?query={UnityWebRequest.EscapeURL(query ?? string.Empty)}&maxResults=20",
+                null);
+
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Body))
+                return new List<JiraUser>();
+
+            try
+            {
+                var wrapped = JsonUtility.FromJson<JiraUserList>("{\"items\":" + response.Body + "}");
+                return ToList(wrapped?.items);
+            }
+            catch
+            {
+                return new List<JiraUser>();
+            }
+        }
+
         // --- HTTP core ------------------------------------------------------
 
         private sealed class JiraResponse

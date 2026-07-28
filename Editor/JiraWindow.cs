@@ -22,7 +22,9 @@ namespace OxenteGames.JiraCommunication
         private const string FieldAssignee = "assignee";
         private const string FieldDueDate = "duedate";
 
-        private enum Tab { Connection, Create, Settings }
+        private enum Tab { Connection, Create, Resolve, Settings }
+
+        private enum ResolveFilter { Mine, Reopened }
 
         private sealed class AdditionalFieldBinding
         {
@@ -98,6 +100,8 @@ namespace OxenteGames.JiraCommunication
         private JiraFieldMeta _priorityMeta;
         private TextField _assigneeSearchField;
         private DropdownField _assigneeDropdown;
+        private VisualElement _assigneeResults;
+        private Label _assigneeSelectedLabel;
         private JiraFieldMeta _assigneeMeta;
         private TextField _startDateField;
         private JiraFieldMeta _startDateMeta;
@@ -128,6 +132,35 @@ namespace OxenteGames.JiraCommunication
         private VisualElement _epicProgressContainer;
         private Label _epicProgressLabel;
         private VisualElement _epicProgressFill;
+
+        // Resolve tab
+        private Button _resolveTab;
+        private VisualElement _resolvePanel;
+        private VisualElement _resolveNotice;
+        private VisualElement _resolveContent;
+        private Button _filterMineBtn;
+        private Button _filterReopenedBtn;
+        private TextField _issueSearchField;
+        private VisualElement _issueListContainer;
+        private Label _issueListStatus;
+        private VisualElement _resolveDetail;
+        private Label _resolveDetailHeader;
+        private DropdownField _transitionDropdown;
+        private TextField _resolveCommentField;
+        private TextField _mentionSearchField;
+        private VisualElement _mentionResults;
+        private VisualElement _mentionChips;
+        private Label _resolveAttachmentLabel;
+        private Label _resolveStatus;
+        private ResolveFilter _resolveFilter = ResolveFilter.Mine;
+        private readonly List<JiraListIssue> _resolveIssues = new List<JiraListIssue>();
+        private readonly List<JiraTransition> _transitions = new List<JiraTransition>();
+        private readonly List<JiraUser> _mentionSelected = new List<JiraUser>();
+        private JiraListIssue _selectedIssue;
+        private string _resolveAttachmentPath = string.Empty;
+        private bool _issuesLoaded;
+        private bool _isResolving;
+        private int _mentionSearchVersion;
 
         private readonly List<JiraProject> _projects = new List<JiraProject>();
         private readonly List<JiraIssueType> _issueTypes = new List<JiraIssueType>();
@@ -195,9 +228,11 @@ namespace OxenteGames.JiraCommunication
 
             _connectionPanel = BuildConnectionPanel();
             _createPanel = BuildCreatePanel();
+            _resolvePanel = BuildResolvePanel();
             _settingsPanel = BuildSettingsPanel();
             scroll.Add(_connectionPanel);
             scroll.Add(_createPanel);
+            scroll.Add(_resolvePanel);
             scroll.Add(_settingsPanel);
 
             BuildBrandFooter();
@@ -291,34 +326,672 @@ namespace OxenteGames.JiraCommunication
 
             _connectionTab = new Button(() => SelectTab(Tab.Connection)) { text = L.Tr(L.K.TabConnection) };
             _createTab = new Button(() => SelectTab(Tab.Create)) { text = L.Tr(L.K.TabCreate) };
+            _resolveTab = new Button(() => SelectTab(Tab.Resolve)) { text = L.Tr(L.K.TabResolve) };
             _settingsTab = new Button(() => SelectTab(Tab.Settings)) { text = L.Tr(L.K.TabSettings) };
             _createTab.style.display = DisplayStyle.None;
+            _resolveTab.style.display = DisplayStyle.None;
 
             bar.Add(_connectionTab);
             bar.Add(_createTab);
+            bar.Add(_resolveTab);
             bar.Add(_settingsTab);
             rootVisualElement.Add(bar);
         }
 
         private void SelectTab(Tab tab)
         {
-            if (tab == Tab.Create && !_isConnected)
+            if ((tab == Tab.Create || tab == Tab.Resolve) && !_isConnected)
                 tab = Tab.Connection;
 
             _activeTab = tab;
-            if (_connectionPanel == null || _createPanel == null || _settingsPanel == null)
+            if (_connectionPanel == null || _createPanel == null ||
+                _resolvePanel == null || _settingsPanel == null)
                 return;
 
             _connectionPanel.style.display = tab == Tab.Connection ? DisplayStyle.Flex : DisplayStyle.None;
             _createPanel.style.display = tab == Tab.Create ? DisplayStyle.Flex : DisplayStyle.None;
+            _resolvePanel.style.display = tab == Tab.Resolve ? DisplayStyle.Flex : DisplayStyle.None;
             _settingsPanel.style.display = tab == Tab.Settings ? DisplayStyle.Flex : DisplayStyle.None;
 
             JiraStyles.ApplyTab(_connectionTab, tab == Tab.Connection);
             JiraStyles.ApplyTab(_createTab, tab == Tab.Create);
+            JiraStyles.ApplyTab(_resolveTab, tab == Tab.Resolve);
             JiraStyles.ApplyTab(_settingsTab, tab == Tab.Settings);
 
             if (tab == Tab.Create)
                 RefreshCreateAvailability();
+            else if (tab == Tab.Resolve)
+                RefreshResolveAvailability();
+        }
+
+        // --- Resolve panel -------------------------------------------------
+
+        private VisualElement BuildResolvePanel()
+        {
+            var panel = new VisualElement();
+
+            _resolveNotice = new VisualElement();
+            JiraStyles.ApplyCard(_resolveNotice);
+            var noticeTitle = new Label(L.Tr(L.K.CreateNoticeTitle));
+            JiraStyles.ApplySectionTitle(noticeTitle);
+            var noticeText = new Label(L.Tr(L.K.ResolveNoticeText));
+            JiraStyles.ApplyMuted(noticeText);
+            var noticeButton = new Button(() => SelectTab(Tab.Connection)) { text = L.Tr(L.K.BtnOpenConnTab) };
+            JiraStyles.ApplySecondaryButton(noticeButton);
+            noticeButton.style.marginTop = 12;
+            _resolveNotice.Add(noticeTitle);
+            _resolveNotice.Add(noticeText);
+            _resolveNotice.Add(noticeButton);
+            panel.Add(_resolveNotice);
+
+            _resolveContent = new VisualElement();
+            _resolveContent.Add(BuildResolveFilters());
+            _resolveContent.Add(BuildIssueListCard());
+            _resolveContent.Add(BuildResolveDetail());
+            panel.Add(_resolveContent);
+
+            return panel;
+        }
+
+        private VisualElement BuildResolveFilters()
+        {
+            var card = new VisualElement();
+            JiraStyles.ApplyCard(card);
+
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.marginBottom = 10;
+
+            _filterMineBtn = new Button(() => SetResolveFilter(ResolveFilter.Mine)) { text = L.Tr(L.K.FilterMine) };
+            JiraStyles.ApplyGhostButton(_filterMineBtn);
+            _filterMineBtn.style.marginRight = 6;
+
+            _filterReopenedBtn = new Button(() => SetResolveFilter(ResolveFilter.Reopened)) { text = L.Tr(L.K.FilterReopened) };
+            JiraStyles.ApplyGhostButton(_filterReopenedBtn);
+            _filterReopenedBtn.style.marginRight = 6;
+
+            var reloadBtn = new Button(() => LoadIssuesAsync()) { text = L.Tr(L.K.BtnReload) };
+            JiraStyles.ApplyGhostButton(reloadBtn);
+
+            row.Add(_filterMineBtn);
+            row.Add(_filterReopenedBtn);
+            row.Add(reloadBtn);
+            card.Add(row);
+
+            var searchHint = new Label(L.Tr(L.K.SearchIssuesPlaceholder));
+            JiraStyles.ApplyFieldHint(searchHint);
+            searchHint.style.marginTop = 0;
+            searchHint.style.marginBottom = 4;
+            card.Add(searchHint);
+
+            _issueSearchField = new TextField();
+            JiraStyles.ApplyField(_issueSearchField);
+            _issueSearchField.style.marginBottom = 0;
+            _issueSearchField.RegisterValueChangedCallback(_ => RenderIssueList());
+            card.Add(_issueSearchField);
+
+            StyleFilterButtons();
+            return card;
+        }
+
+        private VisualElement BuildIssueListCard()
+        {
+            var card = new VisualElement();
+            JiraStyles.ApplyCard(card);
+
+            _issueListStatus = new Label(L.Tr(L.K.MsgLoadingIssues));
+            JiraStyles.ApplyMuted(_issueListStatus);
+            card.Add(_issueListStatus);
+
+            _issueListContainer = new VisualElement();
+            _issueListContainer.style.marginTop = 6;
+            card.Add(_issueListContainer);
+
+            return card;
+        }
+
+        private VisualElement BuildResolveDetail()
+        {
+            _resolveDetail = new VisualElement();
+            JiraStyles.ApplyCard(_resolveDetail);
+
+            _resolveDetailHeader = new Label(L.Tr(L.K.SelectIssueHint));
+            JiraStyles.ApplySectionTitle(_resolveDetailHeader);
+            _resolveDetailHeader.style.whiteSpace = WhiteSpace.Normal;
+            _resolveDetail.Add(_resolveDetailHeader);
+
+            var openButton = new Button(OpenSelectedIssue) { text = L.Tr(L.K.BtnOpenIssue, "issue") };
+            JiraStyles.ApplyLinkButton(openButton);
+            openButton.name = "resolve-open";
+            _resolveDetail.Add(openButton);
+
+            var transitionLabel = new Label(L.Tr(L.K.FieldTransition));
+            JiraStyles.ApplyDynamicFieldLabel(transitionLabel);
+            transitionLabel.style.marginTop = 12;
+            _resolveDetail.Add(transitionLabel);
+
+            _transitionDropdown = new DropdownField();
+            JiraStyles.ApplyDropdown(_transitionDropdown);
+            _resolveDetail.Add(_transitionDropdown);
+
+            _resolveCommentField = new TextField(L.Tr(L.K.FieldComment));
+            JiraStyles.ApplyMultiline(_resolveCommentField);
+            _resolveDetail.Add(_resolveCommentField);
+
+            var mentionLabel = new Label(L.Tr(L.K.FieldMention));
+            JiraStyles.ApplyDynamicFieldLabel(mentionLabel);
+            _resolveDetail.Add(mentionLabel);
+
+            _mentionSearchField = new TextField();
+            _mentionSearchField.tooltip = L.Tr(L.K.MentionSearchPlaceholder);
+            JiraStyles.ApplyField(_mentionSearchField);
+            _mentionSearchField.style.marginBottom = 4;
+            _mentionSearchField.RegisterValueChangedCallback(evt => OnMentionSearchChanged(evt.newValue));
+            _resolveDetail.Add(_mentionSearchField);
+
+            _mentionResults = new VisualElement();
+            _resolveDetail.Add(_mentionResults);
+
+            _mentionChips = new VisualElement();
+            _mentionChips.style.flexDirection = FlexDirection.Row;
+            _mentionChips.style.flexWrap = Wrap.Wrap;
+            _mentionChips.style.marginBottom = 8;
+            _resolveDetail.Add(_mentionChips);
+
+            var attachRow = new VisualElement();
+            attachRow.style.flexDirection = FlexDirection.Row;
+            attachRow.style.alignItems = Align.Center;
+            var attachSelect = new Button(SelectResolveAttachment) { text = L.Tr(L.K.BtnSelectFile) };
+            JiraStyles.ApplyGhostButton(attachSelect);
+            attachSelect.style.marginRight = 8;
+            var attachRemove = new Button(ClearResolveAttachment) { text = L.Tr(L.K.BtnRemoveFile) };
+            JiraStyles.ApplyGhostButton(attachRemove);
+            attachRow.Add(attachSelect);
+            attachRow.Add(attachRemove);
+            _resolveDetail.Add(attachRow);
+
+            _resolveAttachmentLabel = new Label(L.Tr(L.K.AttachFixHint));
+            JiraStyles.ApplyFieldHint(_resolveAttachmentLabel);
+            _resolveAttachmentLabel.style.marginTop = 6;
+            _resolveDetail.Add(_resolveAttachmentLabel);
+
+            var actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.marginTop = 8;
+
+            var commentButton = new Button(() => CommentOnlyAsync()) { text = L.Tr(L.K.BtnComment) };
+            JiraStyles.ApplySecondaryButton(commentButton);
+            commentButton.style.flexGrow = 1;
+            commentButton.style.marginRight = 8;
+
+            var resolveButton = new Button(() => ResolveIssueAsync()) { text = L.Tr(L.K.BtnResolveMarked) };
+            JiraStyles.ApplyPrimaryButton(resolveButton);
+            resolveButton.style.flexGrow = 1;
+            resolveButton.style.marginRight = 0;
+
+            actions.Add(commentButton);
+            actions.Add(resolveButton);
+            _resolveDetail.Add(actions);
+
+            _resolveStatus = new Label();
+            _resolveStatus.style.display = DisplayStyle.None;
+            _resolveDetail.Add(_resolveStatus);
+
+            SetDetailInteractable(false);
+            return _resolveDetail;
+        }
+
+        private void SetDetailInteractable(bool hasIssue)
+        {
+            var open = _resolveDetail.Q<Button>("resolve-open");
+            if (open != null)
+                open.style.display = hasIssue ? DisplayStyle.Flex : DisplayStyle.None;
+
+            _transitionDropdown.style.display = hasIssue ? DisplayStyle.Flex : DisplayStyle.None;
+            _resolveCommentField.style.display = hasIssue ? DisplayStyle.Flex : DisplayStyle.None;
+            _mentionSearchField.style.display = hasIssue ? DisplayStyle.Flex : DisplayStyle.None;
+            _mentionChips.style.display = hasIssue ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void RefreshResolveAvailability()
+        {
+            bool connected = HasCredentials();
+            _resolveNotice.style.display = connected ? DisplayStyle.None : DisplayStyle.Flex;
+            _resolveContent.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (connected && !_issuesLoaded)
+                LoadIssuesAsync();
+        }
+
+        private void SetResolveFilter(ResolveFilter filter)
+        {
+            _resolveFilter = filter;
+            StyleFilterButtons();
+            LoadIssuesAsync();
+        }
+
+        private void StyleFilterButtons()
+        {
+            if (_filterMineBtn == null || _filterReopenedBtn == null)
+                return;
+
+            bool mine = _resolveFilter == ResolveFilter.Mine;
+            _filterMineBtn.style.color = mine ? new StyleColor(new Color32(238, 240, 244, 255)) : new StyleColor(new Color32(173, 181, 194, 255));
+            _filterMineBtn.style.unityFontStyleAndWeight = mine ? FontStyle.Bold : FontStyle.Normal;
+            _filterReopenedBtn.style.color = !mine ? new StyleColor(new Color32(238, 240, 244, 255)) : new StyleColor(new Color32(173, 181, 194, 255));
+            _filterReopenedBtn.style.unityFontStyleAndWeight = !mine ? FontStyle.Bold : FontStyle.Normal;
+        }
+
+        private async void LoadIssuesAsync()
+        {
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+                return;
+
+            _issuesLoaded = true;
+            _issueListStatus.style.display = DisplayStyle.Flex;
+            _issueListStatus.text = L.Tr(L.K.MsgLoadingIssues);
+            _issueListContainer.Clear();
+
+            string jql = _resolveFilter == ResolveFilter.Reopened
+                ? "assignee = currentUser() AND status in (\"Reaberto\", \"Reopened\") ORDER BY updated DESC"
+                : "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC";
+
+            try
+            {
+                List<JiraListIssue> issues = await client.SearchIssuesAsync(jql, 50);
+                _resolveIssues.Clear();
+                _resolveIssues.AddRange(issues);
+                RenderIssueList();
+            }
+            catch (Exception exception)
+            {
+                _resolveIssues.Clear();
+                _issueListContainer.Clear();
+                _issueListStatus.text = exception.Message;
+            }
+        }
+
+        private void RenderIssueList()
+        {
+            if (_issueListContainer == null)
+                return;
+
+            _issueListContainer.Clear();
+            string query = _issueSearchField?.value?.Trim();
+
+            var visible = new List<JiraListIssue>();
+            foreach (JiraListIssue issue in _resolveIssues)
+            {
+                if (issue == null || string.IsNullOrWhiteSpace(issue.key))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(query) &&
+                    !ContainsIgnoreCase(issue.key, query) &&
+                    !ContainsIgnoreCase(issue.Summary, query))
+                    continue;
+                visible.Add(issue);
+            }
+
+            visible.Sort((a, b) =>
+            {
+                bool pa = JiraPreferences.IsIssuePinned(a.key);
+                bool pb = JiraPreferences.IsIssuePinned(b.key);
+                if (pa != pb)
+                    return pa ? -1 : 1;
+                return 0;
+            });
+
+            if (visible.Count == 0)
+            {
+                _issueListStatus.style.display = DisplayStyle.Flex;
+                _issueListStatus.text = L.Tr(L.K.MsgNoIssues);
+                return;
+            }
+
+            _issueListStatus.style.display = DisplayStyle.None;
+            foreach (JiraListIssue issue in visible)
+                _issueListContainer.Add(BuildIssueRow(issue));
+        }
+
+        private VisualElement BuildIssueRow(JiraListIssue issue)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 4;
+
+            bool pinned = JiraPreferences.IsIssuePinned(issue.key);
+            var pin = new Button(() =>
+            {
+                JiraPreferences.ToggleIssuePinned(issue.key);
+                RenderIssueList();
+            })
+            { text = pinned ? "★" : "☆" };
+            pin.tooltip = L.Tr(L.K.PinTooltip);
+            JiraStyles.ApplyGhostButton(pin);
+            pin.style.minWidth = 28;
+            pin.style.marginRight = 6;
+            if (pinned)
+                pin.style.color = new StyleColor(new Color32(255, 196, 0, 255));
+            row.Add(pin);
+
+            var select = new Button(() => SelectIssueAsync(issue))
+            {
+                text = $"{issue.key}  —  {issue.Summary}"
+            };
+            JiraStyles.ApplyGhostButton(select);
+            select.style.flexGrow = 1;
+            select.style.unityTextAlign = TextAnchor.MiddleLeft;
+            bool isSelected = _selectedIssue != null && _selectedIssue.key == issue.key;
+            if (isSelected)
+                select.style.color = new StyleColor(new Color32(38, 132, 255, 255));
+            row.Add(select);
+
+            var status = new Label(issue.StatusName);
+            status.style.marginLeft = 8;
+            status.style.fontSize = 10;
+            status.style.color = StatusColor(issue.StatusCategory);
+            row.Add(status);
+
+            return row;
+        }
+
+        private static StyleColor StatusColor(string category)
+        {
+            switch (category)
+            {
+                case "done": return new StyleColor(new Color32(54, 179, 126, 255));
+                case "indeterminate": return new StyleColor(new Color32(38, 132, 255, 255));
+                default: return new StyleColor(new Color32(173, 181, 194, 255));
+            }
+        }
+
+        private async void SelectIssueAsync(JiraListIssue issue)
+        {
+            _selectedIssue = issue;
+            _mentionSelected.Clear();
+            RenderMentionChips();
+            ClearResolveAttachment();
+            _resolveCommentField.SetValueWithoutNotify(string.Empty);
+            _mentionSearchField.SetValueWithoutNotify(string.Empty);
+            _mentionResults.Clear();
+            HideResolveStatus();
+            RenderIssueList();
+
+            _resolveDetailHeader.text = $"{issue.key} — {issue.Summary}";
+            SetDetailInteractable(true);
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+                return;
+
+            _transitionDropdown.choices = new List<string>();
+            _transitionDropdown.SetValueWithoutNotify(string.Empty);
+
+            try
+            {
+                List<JiraTransition> transitions = await client.GetTransitionsAsync(issue.key);
+                if (_selectedIssue != issue)
+                    return;
+
+                _transitions.Clear();
+                _transitions.AddRange(transitions);
+
+                var labels = new List<string>();
+                foreach (JiraTransition transition in _transitions)
+                {
+                    labels.Add(!string.IsNullOrWhiteSpace(transition.TargetStatus)
+                        ? $"{transition.name} → {transition.TargetStatus}"
+                        : transition.name);
+                }
+
+                _transitionDropdown.choices = labels;
+                if (labels.Count > 0)
+                    _transitionDropdown.SetValueWithoutNotify(labels[0]);
+                else
+                    SetResolveStatus(L.Tr(L.K.MsgNoTransitions), false);
+            }
+            catch (Exception exception)
+            {
+                SetResolveStatus(exception.Message, false);
+            }
+        }
+
+        private void OpenSelectedIssue()
+        {
+            JiraClient client = BuildClientOrNull();
+            if (client == null || _selectedIssue == null)
+                return;
+            Application.OpenURL($"{client.BaseUrl}/browse/{_selectedIssue.key}");
+        }
+
+        // --- Mentions ------------------------------------------------------
+
+        private async void OnMentionSearchChanged(string query)
+        {
+            _mentionResults.Clear();
+            string trimmed = query?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Length < 2)
+                return;
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+                return;
+
+            int version = ++_mentionSearchVersion;
+
+            List<JiraUser> users;
+            try { users = await client.SearchUsersAsync(trimmed); }
+            catch { return; }
+
+            if (version != _mentionSearchVersion)
+                return;
+
+            RenderMentionResults(users);
+        }
+
+        private void RenderMentionResults(List<JiraUser> users)
+        {
+            _mentionResults.Clear();
+            int shown = 0;
+
+            foreach (JiraUser user in users)
+            {
+                if (user == null || string.IsNullOrWhiteSpace(user.accountId))
+                    continue;
+                if (_mentionSelected.Exists(u => u.accountId == user.accountId))
+                    continue;
+
+                var button = new Button(() => AddMention(user)) { text = AssigneeDisplay(user) };
+                JiraStyles.ApplyGhostButton(button);
+                button.style.marginBottom = 3;
+                button.style.unityTextAlign = TextAnchor.MiddleLeft;
+                _mentionResults.Add(button);
+
+                if (++shown >= 6)
+                    break;
+            }
+        }
+
+        private void AddMention(JiraUser user)
+        {
+            if (!_mentionSelected.Exists(u => u.accountId == user.accountId))
+                _mentionSelected.Add(user);
+
+            _mentionSearchField.SetValueWithoutNotify(string.Empty);
+            _mentionResults.Clear();
+            RenderMentionChips();
+        }
+
+        private void RenderMentionChips()
+        {
+            _mentionChips.Clear();
+            foreach (JiraUser user in _mentionSelected)
+            {
+                JiraUser captured = user;
+                var chip = new Button(() =>
+                {
+                    _mentionSelected.RemoveAll(u => u.accountId == captured.accountId);
+                    RenderMentionChips();
+                })
+                { text = $"@{user.displayName}  ✕" };
+                JiraStyles.ApplyGhostButton(chip);
+                chip.style.marginRight = 4;
+                chip.style.marginBottom = 4;
+                chip.style.color = new StyleColor(new Color32(38, 132, 255, 255));
+                _mentionChips.Add(chip);
+            }
+        }
+
+        private void SelectResolveAttachment()
+        {
+            string path = EditorUtility.OpenFilePanel(L.Tr(L.K.BtnSelectFile), string.Empty, string.Empty);
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            _resolveAttachmentPath = path;
+            _resolveAttachmentLabel.text = Path.GetFileName(path);
+        }
+
+        private void ClearResolveAttachment()
+        {
+            _resolveAttachmentPath = string.Empty;
+            if (_resolveAttachmentLabel != null)
+                _resolveAttachmentLabel.text = L.Tr(L.K.AttachFixHint);
+        }
+
+        private async void CommentOnlyAsync()
+        {
+            if (_isResolving || _selectedIssue == null)
+                return;
+
+            string comment = _resolveCommentField.value?.Trim();
+            if (string.IsNullOrWhiteSpace(comment) && _mentionSelected.Count == 0)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgCommentRequired), false);
+                return;
+            }
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgNoCredentials), false);
+                return;
+            }
+
+            SetResolveBusy(true);
+            SetResolveStatus(L.Tr(L.K.MsgResolving), true);
+
+            try
+            {
+                string adf = JiraAdf.BuildCommentBody(_resolveCommentField.value, _mentionSelected);
+                string error = await client.AddCommentAsync(_selectedIssue.key, adf);
+                if (error != null)
+                {
+                    SetResolveStatus(L.Tr(L.K.MsgResolveFailed, error), false);
+                    return;
+                }
+
+                string message = L.Tr(L.K.MsgCommented);
+                message += await UploadResolveAttachment(client);
+
+                SetResolveStatus(message, true);
+                _resolveCommentField.SetValueWithoutNotify(string.Empty);
+                ClearResolveAttachment();
+            }
+            catch (Exception exception)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgResolveFailed, exception.Message), false);
+            }
+            finally
+            {
+                SetResolveBusy(false);
+            }
+        }
+
+        private async void ResolveIssueAsync()
+        {
+            if (_isResolving || _selectedIssue == null)
+                return;
+
+            int index = _transitionDropdown.index;
+            if (index < 0 || index >= _transitions.Count)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgTransitionRequired), false);
+                return;
+            }
+
+            JiraTransition transition = _transitions[index];
+
+            JiraClient client = BuildClientOrNull();
+            if (client == null)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgNoCredentials), false);
+                return;
+            }
+
+            SetResolveBusy(true);
+            SetResolveStatus(L.Tr(L.K.MsgResolving), true);
+
+            try
+            {
+                string comment = _resolveCommentField.value;
+                string adf = (!string.IsNullOrWhiteSpace(comment) || _mentionSelected.Count > 0)
+                    ? JiraAdf.BuildCommentBody(comment, _mentionSelected)
+                    : null;
+
+                string error = await client.ApplyTransitionAsync(_selectedIssue.key, transition.id, adf);
+                if (error != null)
+                {
+                    SetResolveStatus(L.Tr(L.K.MsgResolveFailed, error), false);
+                    return;
+                }
+
+                string message = L.Tr(L.K.MsgTransitionApplied,
+                    string.IsNullOrWhiteSpace(transition.TargetStatus) ? transition.name : transition.TargetStatus);
+                message += await UploadResolveAttachment(client);
+
+                SetResolveStatus(message, true);
+                ClearResolveAttachment();
+                LoadIssuesAsync();
+            }
+            catch (Exception exception)
+            {
+                SetResolveStatus(L.Tr(L.K.MsgResolveFailed, exception.Message), false);
+            }
+            finally
+            {
+                SetResolveBusy(false);
+            }
+        }
+
+        private async Task<string> UploadResolveAttachment(JiraClient client)
+        {
+            if (string.IsNullOrEmpty(_resolveAttachmentPath))
+                return string.Empty;
+
+            string attachError = await client.UploadAttachmentAsync(_selectedIssue.key, _resolveAttachmentPath);
+            return attachError == null
+                ? L.Tr(L.K.MsgAttachmentSent)
+                : L.Tr(L.K.MsgAttachSendFailed, attachError);
+        }
+
+        private void SetResolveBusy(bool busy)
+        {
+            _isResolving = busy;
+        }
+
+        private void SetResolveStatus(string message, bool success)
+        {
+            _resolveStatus.text = message;
+            _resolveStatus.style.display = DisplayStyle.Flex;
+            JiraStyles.ApplyStatus(_resolveStatus, success);
+        }
+
+        private void HideResolveStatus()
+        {
+            if (_resolveStatus != null)
+                _resolveStatus.style.display = DisplayStyle.None;
         }
 
         // --- Connection panel ----------------------------------------------
@@ -1556,6 +2229,7 @@ namespace OxenteGames.JiraCommunication
         {
             _priorityDropdown = null; _priorityMeta = null;
             _assigneeSearchField = null; _assigneeDropdown = null; _assigneeMeta = null;
+            _assigneeResults = null; _assigneeSelectedLabel = null;
             _filteredAssignableUsers.Clear();
             _startDateField = null; _startDateMeta = null;
             _dueDateField = null; _dueDateMeta = null;
@@ -1701,10 +2375,21 @@ namespace OxenteGames.JiraCommunication
 
             _assigneeSearchField = new TextField(L.Tr(L.K.FieldAssigneeSearch));
             JiraStyles.ApplyField(_assigneeSearchField);
+            _assigneeSearchField.style.marginBottom = 4;
             container.Add(_assigneeSearchField);
 
+            // Inline clickable results — no need to open a dropdown to pick.
+            _assigneeResults = new VisualElement();
+            container.Add(_assigneeResults);
+
+            _assigneeSelectedLabel = new Label();
+            JiraStyles.ApplyFieldHint(_assigneeSelectedLabel);
+            _assigneeSelectedLabel.style.marginTop = 2;
+            container.Add(_assigneeSelectedLabel);
+
+            // Hidden backing store read by ApplyDynamicFields / SavePresets.
             _assigneeDropdown = new DropdownField(label);
-            JiraStyles.ApplyDropdown(_assigneeDropdown);
+            _assigneeDropdown.style.display = DisplayStyle.None;
             container.Add(_assigneeDropdown);
 
             RefreshAssigneeChoices(string.Empty, presetAccountId);
@@ -1720,6 +2405,62 @@ namespace OxenteGames.JiraCommunication
             container.Add(selfButton);
 
             return container;
+        }
+
+        private void RenderAssigneeResults(string query)
+        {
+            if (_assigneeResults == null)
+                return;
+
+            _assigneeResults.Clear();
+            if (string.IsNullOrWhiteSpace(query))
+                return;
+
+            int shown = 0;
+            for (int i = 0; i < _filteredAssignableUsers.Count; i++)
+            {
+                int captured = i;
+                var button = new Button(() => SelectAssignee(captured))
+                {
+                    text = AssigneeDisplay(_filteredAssignableUsers[i])
+                };
+                JiraStyles.ApplyGhostButton(button);
+                button.style.marginBottom = 3;
+                button.style.unityTextAlign = TextAnchor.MiddleLeft;
+                _assigneeResults.Add(button);
+
+                if (++shown >= 6)
+                    break;
+            }
+        }
+
+        private void SelectAssignee(int filteredIndex)
+        {
+            if (_assigneeDropdown == null ||
+                filteredIndex < 0 || filteredIndex >= _filteredAssignableUsers.Count)
+                return;
+
+            _assigneeDropdown.index = filteredIndex + 1; // +1 for the "None" entry
+            JiraUser user = _filteredAssignableUsers[filteredIndex];
+            _assigneeSearchField?.SetValueWithoutNotify(user.displayName ?? string.Empty);
+            _assigneeResults?.Clear();
+            UpdateAssigneeSelectedLabel();
+        }
+
+        private void UpdateAssigneeSelectedLabel()
+        {
+            if (_assigneeSelectedLabel == null)
+                return;
+
+            string accountId = SelectedAssigneeAccountId();
+            if (string.IsNullOrWhiteSpace(accountId))
+            {
+                _assigneeSelectedLabel.text = L.Tr(L.K.AssigneeNone);
+                return;
+            }
+
+            JiraUser user = _assignableUsers.Find(u => u != null && u.accountId == accountId);
+            _assigneeSelectedLabel.text = user != null ? AssigneeDisplay(user) : accountId;
         }
 
         private void RefreshAssigneeChoices(string query, string preferredAccountId)
@@ -1768,6 +2509,9 @@ namespace OxenteGames.JiraCommunication
 
             _assigneeDropdown.choices = labels;
             _assigneeDropdown.SetValueWithoutNotify(labels[selected]);
+
+            RenderAssigneeResults(normalizedQuery);
+            UpdateAssigneeSelectedLabel();
         }
 
         private static bool MatchesAssignee(JiraUser user, string query)
@@ -1923,6 +2667,9 @@ namespace OxenteGames.JiraCommunication
                 u => u.accountId == _myself.accountId);
             if (index >= 0)
                 _assigneeDropdown.index = index + 1; // +1 for the "None" entry
+
+            _assigneeResults?.Clear();
+            UpdateAssigneeSelectedLabel();
         }
 
         private static VisualElement BuildDateWidget(string label, out TextField field)
@@ -2637,6 +3384,8 @@ namespace OxenteGames.JiraCommunication
             _isConnected = connected;
             if (_createTab != null)
                 _createTab.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_resolveTab != null)
+                _resolveTab.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private static bool HasCredentials()

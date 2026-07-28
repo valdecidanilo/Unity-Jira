@@ -248,6 +248,38 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.MsgAiDone] = new[] { "Campos preenchidos pela IA. Revise antes de criar.", "Fields drafted by AI. Review before creating." },
             [K.MsgAiFailed] = new[] { "Falha na IA: {0}", "AI error: {0}" },
 
+            [K.TabResolve] = new[] { "Resolver", "Resolve" },
+            [K.ResolveNoticeText] = new[]
+            {
+                "Para resolver issues, valide sua conexão na aba \"Conexão\".",
+                "To resolve issues, validate your connection on the \"Connection\" tab."
+            },
+            [K.FilterMine] = new[] { "Minhas em aberto", "My open issues" },
+            [K.FilterReopened] = new[] { "Reabertas", "Reopened" },
+            [K.BtnReload] = new[] { "Recarregar", "Reload" },
+            [K.SearchIssuesPlaceholder] = new[] { "Filtrar por chave ou título...", "Filter by key or title..." },
+            [K.MsgLoadingIssues] = new[] { "Carregando issues...", "Loading issues..." },
+            [K.MsgNoIssues] = new[] { "Nenhuma issue encontrada para este filtro.", "No issues found for this filter." },
+            [K.PinTooltip] = new[] { "Fixar / desafixar", "Pin / unpin" },
+            [K.SelectIssueHint] = new[] { "Selecione uma issue na lista para resolver.", "Select an issue from the list to resolve." },
+            [K.FieldTransition] = new[] { "Transição (workflow)", "Transition (workflow)" },
+            [K.FieldComment] = new[] { "Comentário", "Comment" },
+            [K.FieldMention] = new[] { "Mencionar pessoas", "Mention people" },
+            [K.MentionSearchPlaceholder] = new[] { "Buscar pessoa para mencionar...", "Search a person to mention..." },
+            [K.AttachFixHint] = new[] { "Anexe o print/arquivo do fix (opcional).", "Attach the fix screenshot/file (optional)." },
+            [K.BtnComment] = new[] { "Comentar", "Comment" },
+            [K.BtnApplyTransition] = new[] { "Aplicar transição", "Apply transition" },
+            [K.BtnResolveMarked] = new[] { "Concluir (transição + comentário)", "Resolve (transition + comment)" },
+            [K.MsgCommentRequired] = new[] { "Escreva um comentário.", "Write a comment." },
+            [K.MsgTransitionRequired] = new[] { "Selecione uma transição.", "Select a transition." },
+            [K.MsgResolving] = new[] { "Enviando para o Jira...", "Sending to Jira..." },
+            [K.MsgCommented] = new[] { "Comentário adicionado.", "Comment added." },
+            [K.MsgTransitionApplied] = new[] { "Issue movida para \"{0}\".", "Issue moved to \"{0}\"." },
+            [K.MsgAttachmentSent] = new[] { " Anexo enviado.", " Attachment uploaded." },
+            [K.MsgAttachSendFailed] = new[] { " (Anexo não enviado: {0})", " (Attachment not uploaded: {0})" },
+            [K.MsgResolveFailed] = new[] { "Falha: {0}", "Error: {0}" },
+            [K.MsgNoTransitions] = new[] { "Nenhuma transição disponível para você nesta issue.", "No transitions available to you for this issue." },
+
             [K.SettingsTitle] = new[] { "Configurações", "Settings" },
             [K.SettingsLanguage] = new[] { "Idioma / Language", "Language / Idioma" },
             [K.LangPortuguese] = new[] { "Português", "Portuguese" },
@@ -389,6 +421,33 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAiGenerating = "MsgAiGenerating";
             public const string MsgAiDone = "MsgAiDone";
             public const string MsgAiFailed = "MsgAiFailed";
+            public const string TabResolve = "TabResolve";
+            public const string ResolveNoticeText = "ResolveNoticeText";
+            public const string FilterMine = "FilterMine";
+            public const string FilterReopened = "FilterReopened";
+            public const string BtnReload = "BtnReload";
+            public const string SearchIssuesPlaceholder = "SearchIssuesPlaceholder";
+            public const string MsgLoadingIssues = "MsgLoadingIssues";
+            public const string MsgNoIssues = "MsgNoIssues";
+            public const string PinTooltip = "PinTooltip";
+            public const string SelectIssueHint = "SelectIssueHint";
+            public const string FieldTransition = "FieldTransition";
+            public const string FieldComment = "FieldComment";
+            public const string FieldMention = "FieldMention";
+            public const string MentionSearchPlaceholder = "MentionSearchPlaceholder";
+            public const string AttachFixHint = "AttachFixHint";
+            public const string BtnComment = "BtnComment";
+            public const string BtnApplyTransition = "BtnApplyTransition";
+            public const string BtnResolveMarked = "BtnResolveMarked";
+            public const string MsgCommentRequired = "MsgCommentRequired";
+            public const string MsgTransitionRequired = "MsgTransitionRequired";
+            public const string MsgResolving = "MsgResolving";
+            public const string MsgCommented = "MsgCommented";
+            public const string MsgTransitionApplied = "MsgTransitionApplied";
+            public const string MsgAttachmentSent = "MsgAttachmentSent";
+            public const string MsgAttachSendFailed = "MsgAttachSendFailed";
+            public const string MsgResolveFailed = "MsgResolveFailed";
+            public const string MsgNoTransitions = "MsgNoTransitions";
             public const string SettingsTitle = "SettingsTitle";
             public const string SettingsLanguage = "SettingsLanguage";
             public const string LangPortuguese = "LangPortuguese";
