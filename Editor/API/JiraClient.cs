@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using OxenteGames.JiraCommunication.Models;
@@ -43,6 +44,16 @@ namespace OxenteGames.JiraCommunication.API
             }
         }
 
+        public async Task<JiraUser> GetMyselfAsync()
+        {
+            JiraResponse response = await SendAsync(UnityWebRequest.kHttpVerbGET, "/rest/api/3/myself", null);
+            if (!response.Success)
+                return null;
+
+            try { return JsonUtility.FromJson<JiraUser>(response.Body); }
+            catch { return null; }
+        }
+
         // --- Metadata -------------------------------------------------------
 
         public async Task<List<JiraProject>> GetProjectsAsync()
@@ -59,14 +70,83 @@ namespace OxenteGames.JiraCommunication.API
 
         public async Task<List<JiraIssueType>> GetIssueTypesAsync(string projectKey)
         {
+            string encodedKey = UnityWebRequest.EscapeURL(projectKey);
+
             JiraResponse response = await SendAsync(
                 UnityWebRequest.kHttpVerbGET,
-                $"/rest/api/3/issue/createmeta/{UnityWebRequest.EscapeURL(projectKey)}/issuetypes?maxResults=100",
+                $"/rest/api/3/issue/createmeta/{encodedKey}/issuetypes?maxResults=100",
                 null);
 
-            ThrowIfFailed(response, "Não foi possível carregar os tipos de issue do projeto.");
-            var page = JsonUtility.FromJson<JiraIssueTypePage>(response.Body);
+            if (response.Success)
+            {
+                var page = JsonUtility.FromJson<JiraIssueTypePage>(response.Body);
+                List<JiraIssueType> types = ToList(page?.values);
+                if (types.Count > 0)
+                    return types;
+            }
+
+            List<JiraIssueType> legacy = await GetIssueTypesLegacyAsync(encodedKey);
+            if (legacy.Count > 0)
+                return legacy;
+
+            if (!response.Success)
+                ThrowIfFailed(response, "Não foi possível carregar os tipos de issue do projeto.");
+
+            return new List<JiraIssueType>();
+        }
+
+        private async Task<List<JiraIssueType>> GetIssueTypesLegacyAsync(string encodedProjectKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/issue/createmeta?projectKeys={encodedProjectKey}&expand=projects.issuetypes",
+                null);
+
+            if (!response.Success)
+                return new List<JiraIssueType>();
+
+            var meta = JsonUtility.FromJson<JiraClassicCreateMeta>(response.Body);
+            if (meta?.projects != null && meta.projects.Length > 0)
+                return ToList(meta.projects[0].issuetypes);
+
+            return new List<JiraIssueType>();
+        }
+
+        /// <summary>Fields available when creating a given issue type in a project.</summary>
+        public async Task<List<JiraFieldMeta>> GetCreateFieldsAsync(string projectKey, string issueTypeId)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/issue/createmeta/{UnityWebRequest.EscapeURL(projectKey)}/issuetypes/{UnityWebRequest.EscapeURL(issueTypeId)}?maxResults=200",
+                null);
+
+            if (!response.Success)
+                return new List<JiraFieldMeta>();
+
+            var page = JsonUtility.FromJson<JiraFieldMetaPage>(response.Body);
             return ToList(page?.values);
+        }
+
+        public async Task<List<JiraUser>> GetAssignableUsersAsync(string projectKey)
+        {
+            JiraResponse response = await SendAsync(
+                UnityWebRequest.kHttpVerbGET,
+                $"/rest/api/3/user/assignable/search?project={UnityWebRequest.EscapeURL(projectKey)}&maxResults=50",
+                null);
+
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Body))
+                return new List<JiraUser>();
+
+            try
+            {
+                // Body is a top-level JSON array; wrap it so JsonUtility can read it.
+                var wrapped = JsonUtility.FromJson<JiraUserList>("{\"items\":" + response.Body + "}");
+                return ToList(wrapped?.items);
+            }
+            catch
+            {
+                return new List<JiraUser>();
+            }
         }
 
         public async Task<List<JiraBoard>> GetBoardsAsync(string projectKey)
@@ -76,7 +156,6 @@ namespace OxenteGames.JiraCommunication.API
                 $"/rest/agile/1.0/board?projectKeyOrId={UnityWebRequest.EscapeURL(projectKey)}&maxResults=50",
                 null);
 
-            // The Agile API may be unavailable (e.g. Jira Core). Treat as "no boards".
             if (!response.Success)
                 return new List<JiraBoard>();
 
@@ -91,7 +170,6 @@ namespace OxenteGames.JiraCommunication.API
                 $"/rest/agile/1.0/board/{boardId}/sprint?state=active&maxResults=50",
                 null);
 
-            // Kanban boards return 400 for sprint queries. Treat as "no sprints".
             if (!response.Success)
                 return new List<JiraSprint>();
 
@@ -155,6 +233,30 @@ namespace OxenteGames.JiraCommunication.API
             return response.Success ? null : BuildIssueError(response);
         }
 
+        /// <summary>Uploads a file to an issue. Returns null on success or an error message.</summary>
+        public async Task<string> UploadAttachmentAsync(string issueKey, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return "Arquivo de anexo não encontrado.";
+
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(filePath); }
+            catch (Exception exception) { return $"Não foi possível ler o anexo: {exception.Message}"; }
+
+            string fileName = Path.GetFileName(filePath);
+            var form = new List<IMultipartFormSection>
+            {
+                new MultipartFormFileSection("file", bytes, fileName, "application/octet-stream")
+            };
+
+            UnityWebRequest request = UnityWebRequest.Post(_baseUrl + $"/rest/api/3/issue/{issueKey}/attachments", form);
+            request.timeout = 60;
+            request.SetRequestHeader("X-Atlassian-Token", "no-check");
+
+            JiraResponse response = await AwaitRequest(request);
+            return response.Success ? null : BuildIssueError(response);
+        }
+
         // --- HTTP core ------------------------------------------------------
 
         private sealed class JiraResponse
@@ -167,7 +269,6 @@ namespace OxenteGames.JiraCommunication.API
 
         private Task<JiraResponse> SendAsync(string method, string relativePath, string jsonBody)
         {
-            var completion = new TaskCompletionSource<JiraResponse>();
             string url = _baseUrl + relativePath;
 
             UnityWebRequest request;
@@ -186,9 +287,15 @@ namespace OxenteGames.JiraCommunication.API
             }
 
             request.timeout = 30;
+            return AwaitRequest(request);
+        }
+
+        private Task<JiraResponse> AwaitRequest(UnityWebRequest request)
+        {
             request.SetRequestHeader("Authorization", _authProvider.BuildAuthorizationHeader());
             request.SetRequestHeader("Accept", "application/json");
 
+            var completion = new TaskCompletionSource<JiraResponse>();
             UnityWebRequestAsyncOperation operation = request.SendWebRequest();
 
             void PollRequest()
@@ -201,14 +308,13 @@ namespace OxenteGames.JiraCommunication.API
                 try
                 {
                     bool success = request.result == UnityWebRequest.Result.Success;
-                    var response = new JiraResponse
+                    completion.TrySetResult(new JiraResponse
                     {
                         Success = success,
                         StatusCode = request.responseCode,
                         Body = request.downloadHandler != null ? request.downloadHandler.text : string.Empty,
                         Error = success ? null : BuildFriendlyError(request)
-                    };
-                    completion.TrySetResult(response);
+                    });
                 }
                 finally
                 {
@@ -260,8 +366,6 @@ namespace OxenteGames.JiraCommunication.API
                 // Ignore: fall back to the field-level extraction below.
             }
 
-            // Field-level errors arrive as {"errors":{"summary":"..."}} which
-            // JsonUtility cannot parse into a dictionary, so read them lightly.
             int errorsIndex = body.IndexOf("\"errors\":{", StringComparison.Ordinal);
             if (errorsIndex >= 0)
             {

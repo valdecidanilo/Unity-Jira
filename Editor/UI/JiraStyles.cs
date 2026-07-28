@@ -214,5 +214,54 @@ namespace OxenteGames.JiraCommunication.UI
             label.style.marginBottom = 10;
             label.style.whiteSpace = WhiteSpace.Normal;
         }
+
+        /// <summary>Wraps two elements side by side, each taking half the width.</summary>
+        public static VisualElement Row(VisualElement left, VisualElement right)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+
+            left.style.flexGrow = 1;
+            left.style.flexBasis = 0;
+            left.style.marginRight = 6;
+
+            right.style.flexGrow = 1;
+            right.style.flexBasis = 0;
+            right.style.marginLeft = 6;
+
+            row.Add(left);
+            row.Add(right);
+            return row;
+        }
+
+        public static void ApplyGhostButton(Button button)
+        {
+            button.style.height = 26;
+            button.style.paddingLeft = 10;
+            button.style.paddingRight = 10;
+            button.style.backgroundColor = SurfaceRaised;
+            button.style.color = TextSecondary;
+            button.style.fontSize = 11;
+            button.style.borderTopLeftRadius = 5;
+            button.style.borderTopRightRadius = 5;
+            button.style.borderBottomLeftRadius = 5;
+            button.style.borderBottomRightRadius = 5;
+            button.style.borderLeftWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            button.style.borderLeftColor = Border;
+            button.style.borderRightColor = Border;
+            button.style.borderTopColor = Border;
+            button.style.borderBottomColor = Border;
+        }
+
+        public static void ApplyNote(Label label)
+        {
+            label.style.color = TextSecondary;
+            label.style.fontSize = 10;
+            label.style.marginTop = 8;
+            label.style.whiteSpace = WhiteSpace.Normal;
+        }
     }
 }

@@ -82,6 +82,20 @@ namespace OxenteGames.JiraCommunication.Models
         public JiraEpic[] values;
     }
 
+    // Legacy fallback: GET /rest/api/3/issue/createmeta?projectKeys=X&expand=projects.issuetypes
+    [Serializable]
+    internal sealed class JiraClassicCreateMeta
+    {
+        public JiraClassicMetaProject[] projects;
+    }
+
+    [Serializable]
+    internal sealed class JiraClassicMetaProject
+    {
+        public string key;
+        public JiraIssueType[] issuetypes;
+    }
+
     [Serializable]
     internal sealed class JiraCreatedIssue
     {
@@ -94,5 +108,55 @@ namespace OxenteGames.JiraCommunication.Models
     internal sealed class JiraErrorPayload
     {
         public string[] errorMessages;
+    }
+
+    // --- Create metadata fields (GET .../issuetypes/{id}) ---
+
+    [Serializable]
+    internal sealed class JiraFieldSchema
+    {
+        public string type;   // string, date, datetime, priority, user, option, array...
+        public string items;  // element type when type == "array"
+        public string system; // e.g. "summary", "duedate", "assignee", "priority"
+        public string custom; // custom field type url (null for system fields)
+        public int customId;
+    }
+
+    [Serializable]
+    internal sealed class JiraAllowedValue
+    {
+        public string id;
+        public string name;   // priority / version / component
+        public string value;  // option / select
+
+        public string Display =>
+            !string.IsNullOrWhiteSpace(value) ? value :
+            !string.IsNullOrWhiteSpace(name) ? name : id;
+    }
+
+    [Serializable]
+    internal sealed class JiraFieldMeta
+    {
+        public bool required;
+        public string name;
+        public string fieldId;
+        public JiraFieldSchema schema;
+        public JiraAllowedValue[] allowedValues;
+
+        public bool HasAllowedValues => allowedValues != null && allowedValues.Length > 0;
+    }
+
+    [Serializable]
+    internal sealed class JiraFieldMetaPage
+    {
+        public JiraFieldMeta[] values;
+    }
+
+    // Wrapper so JsonUtility can read the top-level array returned by
+    // GET /rest/api/3/user/assignable/search.
+    [Serializable]
+    internal sealed class JiraUserList
+    {
+        public JiraUser[] items;
     }
 }
