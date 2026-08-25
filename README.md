@@ -20,6 +20,10 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
 - Troca automática para a aba de criação quando a conexão é validada.
 - Aba **Resolver**: liste suas issues em aberto e as reabertas, **fixe** as importantes, aplique as **transições** do workflow da empresa, **comente**, **anexe** o print/arquivo do fix e **mencione pessoas** (@) — tudo de dentro do Unity.
 - **Assistente de IA** na aba Criar: descreva a atividade em poucas palavras e a IA preenche título, descrição e prioridade. Suporta **Claude (Anthropic)** e **ChatGPT (OpenAI)** — cada usuário usa sua própria API Key (mantida só na sessão do Unity), com escolha de provedor e modelo nas Configurações.
+- **Agente local** na aba Agente: um agente de código (**Claude Code** ou **Codex CLI**) trabalha no
+  repositório do projeto a partir de uma tarefa ou de uma atividade do Jira, com transcrição ao vivo,
+  resultado, histórico e cancelamento. A execução roda em background e sobrevive a recompilação e ao
+  fechamento do Unity. Nenhum token novo é armazenado. Ver *Agente local* abaixo.
 - **Integração Git/GitHub por convenção**: no detalhe de cada atividade, gera o **nome do branch** (`feat/PROJ-123-titulo`) e a **mensagem de commit** Conventional (`feat(PROJ-123): título`), cria/faz checkout do branch localmente e copia os textos — sem enviar nada ao GitHub e sem precisar de token do GitHub.
 - Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA, integração Git/GitHub e limpeza dos dados de conexão salvos.
 - Mensagens amigáveis para erros HTTP comuns.
@@ -106,6 +110,64 @@ automaticamente conforme o estado do PR:
    - *Pull request merjado* → transição para **Concluído**.
 
 Assim o desenvolvedor só escolhe o estado/semântica; a plataforma cuida do resto.
+
+## Agente local (aba Agente)
+
+Além do **Assistente de IA** (que preenche título/descrição via HTTP), o package
+dirige um **agente de código local** — `claude` (Claude Code) ou `codex` (Codex
+CLI) — que trabalha no repositório do projeto sem sair do Unity.
+
+São coisas diferentes de propósito: o assistente é uma chamada HTTP sem estado
+que devolve campos; o agente é um processo local que lê o projeto, edita arquivos
+e roda comandos.
+
+### Como usar
+
+1. Instale a CLI do provedor escolhido em `Configurações → Assistente de IA`:
+   - Claude Code: `npm install -g @anthropic-ai/claude-code`
+   - Codex: `npm install -g @openai/codex`
+2. Abra `Jira → Jira Workspace → Agente`. O card **CLI do agente** mostra se ela
+   foi encontrada; se o Unity não herdar o PATH do seu shell, informe o caminho
+   manualmente.
+3. Clique em **Gerar / atualizar** em *Instruções do projeto*. Isso escreve a
+   convenção de branch/commit configurada e os cuidados de Unity em:
+   - Claude: `.claude/skills/jira-unity/SKILL.md`
+   - Codex: bloco delimitado em `AGENTS.md` (o resto do arquivo é preservado)
+4. Escreva a tarefa, escolha as **permissões** e clique em **Executar em background**.
+
+Na aba **Atividades**, o botão **Enviar para o agente** leva chave, título,
+descrição e o nome do branch da convenção já preenchidos.
+
+### Permissões
+
+| Modo | Efeito |
+| --- | --- |
+| Somente leitura | Investiga e propõe; nada em disco muda. É o padrão. |
+| Padrão da CLI | A CLI pergunta antes de editar — e em background ninguém responde, então ela para. |
+| Editar sem perguntar | Para execuções que devem alterar o projeto. |
+
+`bypassPermissions` não é exposto: um agente headless com todas as travas
+desligadas não deve ser alcançável por um clique.
+
+### Por que a execução não se perde
+
+Cada execução é um diretório em `Library/JiraAgent/<runId>` com o prompt, o
+script lançador, o stream de eventos, o stderr e o código de saída. A CLI escreve
+direto nesses arquivos e o Editor apenas **lê** — não há pipe entre os dois.
+
+Por isso recompilar scripts, entrar em Play Mode ou fechar o Unity não interrompe
+nem perde uma execução, e a transcrição fica disponível para replay depois.
+`Library/` é por projeto e já ignorado pelo Git, então nada disso é commitado.
+
+O botão **Abrir no terminal** existe para uma sessão interativa; ela
+deliberadamente **não** entra no histórico, porque não há stream para acompanhar.
+
+### Credenciais
+
+Este caminho **não guarda nenhum token**. A CLI usa a conta em que o
+desenvolvedor já está logado, e as instruções geradas dizem ao agente para não
+tentar falar com a API do Jira — transições e comentários continuam sendo feitos
+nesta janela, que já tem o token.
 
 ## Segurança
 

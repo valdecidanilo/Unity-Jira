@@ -607,5 +607,164 @@ namespace OxenteGames.JiraCommunication.UI
             label.style.marginTop = 8;
             label.style.whiteSpace = WhiteSpace.Normal;
         }
+
+        // --- Agent console -------------------------------------------------
+
+        private static Color ToneColor(JiraTone tone)
+        {
+            switch (tone)
+            {
+                case JiraTone.Accent: return Accent;
+                case JiraTone.Success: return Success;
+                case JiraTone.Danger: return Danger;
+                default: return TextSecondary;
+            }
+        }
+
+        /// <summary>Compact status badge used for run state.</summary>
+        public static void ApplyStatusPill(Label label, JiraTone tone)
+        {
+            Color color = ToneColor(tone);
+
+            label.style.color = color;
+            label.style.fontSize = 9;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.paddingLeft = 7;
+            label.style.paddingRight = 7;
+            label.style.paddingTop = 2;
+            label.style.paddingBottom = 2;
+            label.style.marginRight = 8;
+            label.style.borderTopLeftRadius = 9;
+            label.style.borderTopRightRadius = 9;
+            label.style.borderBottomLeftRadius = 9;
+            label.style.borderBottomRightRadius = 9;
+            label.style.borderLeftWidth = 1;
+            label.style.borderRightWidth = 1;
+            label.style.borderTopWidth = 1;
+            label.style.borderBottomWidth = 1;
+            label.style.borderLeftColor = color;
+            label.style.borderRightColor = color;
+            label.style.borderTopColor = color;
+            label.style.borderBottomColor = color;
+            label.style.flexShrink = 0;
+        }
+
+        /// <summary>Scroll region that holds the live transcript.</summary>
+        public static void ApplyTranscriptScroll(ScrollView scroll)
+        {
+            scroll.style.maxHeight = 260;
+            scroll.style.minHeight = 90;
+            scroll.style.marginTop = 8;
+            scroll.style.backgroundColor = Background;
+            scroll.style.borderTopLeftRadius = 6;
+            scroll.style.borderTopRightRadius = 6;
+            scroll.style.borderBottomLeftRadius = 6;
+            scroll.style.borderBottomRightRadius = 6;
+            scroll.style.borderLeftWidth = 1;
+            scroll.style.borderRightWidth = 1;
+            scroll.style.borderTopWidth = 1;
+            scroll.style.borderBottomWidth = 1;
+            scroll.style.borderLeftColor = Border;
+            scroll.style.borderRightColor = Border;
+            scroll.style.borderTopColor = Border;
+            scroll.style.borderBottomColor = Border;
+            scroll.style.paddingLeft = 8;
+            scroll.style.paddingRight = 8;
+            scroll.style.paddingTop = 6;
+            scroll.style.paddingBottom = 6;
+        }
+
+        /// <summary>One transcript line: a tone-colored tag plus its text.</summary>
+        public static void ApplyTranscriptTag(Label label, JiraTone tone)
+        {
+            label.style.color = ToneColor(tone);
+            label.style.fontSize = 9;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.width = 74;
+            label.style.flexShrink = 0;
+            label.style.marginRight = 6;
+        }
+
+        public static void ApplyTranscriptText(Label label)
+        {
+            label.style.color = TextPrimary;
+            label.style.fontSize = 10;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.flexGrow = 1;
+            label.style.flexShrink = 1;
+        }
+
+        public static void ApplyTranscriptRow(VisualElement row)
+        {
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.FlexStart;
+            row.style.marginBottom = 3;
+        }
+
+        /// <summary>Monospace-ish block for a final answer or an error dump.</summary>
+        public static void ApplyResultBlock(Label label, bool isError)
+        {
+            label.style.color = isError ? Danger : TextPrimary;
+            label.style.fontSize = 10;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.backgroundColor = Background;
+            label.style.paddingLeft = 9;
+            label.style.paddingRight = 9;
+            label.style.paddingTop = 8;
+            label.style.paddingBottom = 8;
+            label.style.marginTop = 6;
+            label.style.borderTopLeftRadius = 6;
+            label.style.borderTopRightRadius = 6;
+            label.style.borderBottomLeftRadius = 6;
+            label.style.borderBottomRightRadius = 6;
+            label.style.borderLeftWidth = 2;
+            label.style.borderLeftColor = isError ? Danger : Accent;
+        }
+
+        /// <summary>Selectable row in the run history list.</summary>
+        public static void ApplyRunRow(Button button, bool selected)
+        {
+            button.style.height = 26;
+            button.style.marginBottom = 3;
+            button.style.marginLeft = 0;
+            button.style.marginRight = 0;
+            button.style.paddingLeft = 8;
+            button.style.paddingRight = 8;
+            button.style.fontSize = 10;
+            button.style.unityTextAlign = TextAnchor.MiddleLeft;
+            button.style.color = selected ? TextPrimary : TextSecondary;
+            button.style.backgroundColor = selected ? SurfaceRaised : Surface;
+            button.style.borderTopLeftRadius = 5;
+            button.style.borderTopRightRadius = 5;
+            button.style.borderBottomLeftRadius = 5;
+            button.style.borderBottomRightRadius = 5;
+            button.style.borderLeftWidth = selected ? 2 : 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            button.style.borderLeftColor = selected ? Accent : Border;
+            button.style.borderRightColor = Border;
+            button.style.borderTopColor = Border;
+            button.style.borderBottomColor = Border;
+        }
+
+        /// <summary>Horizontal container for a group of buttons.</summary>
+        public static void ApplyButtonRow(VisualElement row)
+        {
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 8;
+            row.style.flexWrap = Wrap.Wrap;
+        }
+    }
+
+    /// <summary>Semantic color roles, so callers never name a raw color.</summary>
+    internal enum JiraTone
+    {
+        Neutral,
+        Accent,
+        Success,
+        Danger
     }
 }

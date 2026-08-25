@@ -26,7 +26,7 @@ namespace OxenteGames.JiraCommunication
             "jira-priority-dropdown-icon";
         private const int ResolveIssuesPerPage = 15;
 
-        private enum Tab { Connection, Create, Resolve, Settings }
+        private enum Tab { Connection, Create, Resolve, Agent, Settings }
 
         private enum ResolveSprintScope
         {
@@ -105,9 +105,14 @@ namespace OxenteGames.JiraCommunication
         private Button _connectionTab;
         private Button _createTab;
         private Button _settingsTab;
+        private Button _agentTab;
         private VisualElement _connectionPanel;
         private VisualElement _createPanel;
         private VisualElement _settingsPanel;
+        private VisualElement _agentPanel;
+
+        // Owns event subscriptions, so it must be disposed whenever the UI is rebuilt.
+        private AgentConsoleView _agentConsole;
         private Tab _activeTab = Tab.Connection;
 
         // Create tab - core
@@ -407,6 +412,11 @@ namespace OxenteGames.JiraCommunication
 
             ReleaseAttachmentPreviewTexture();
             CloseStatusPopup();
+
+            // rootVisualElement is cleared below; the outgoing console must let go of
+            // its AgentService subscriptions or it would keep updating dead elements.
+            _agentConsole?.Dispose();
+            _agentConsole = null;
             _loaderAnimation?.Pause();
             _loaderSpinners.Clear();
             _destinationIsLoading = false;
@@ -428,10 +438,12 @@ namespace OxenteGames.JiraCommunication
             _connectionPanel = BuildConnectionPanel();
             _createPanel = BuildCreatePanel();
             _resolvePanel = BuildResolvePanel();
+            _agentPanel = BuildAgentPanel();
             _settingsPanel = BuildSettingsPanel();
             scroll.Add(_connectionPanel);
             scroll.Add(_createPanel);
             scroll.Add(_resolvePanel);
+            scroll.Add(_agentPanel);
             scroll.Add(_settingsPanel);
 
             BuildBrandFooter();
@@ -546,13 +558,17 @@ namespace OxenteGames.JiraCommunication
             _connectionTab = new Button(() => SelectTab(Tab.Connection)) { text = L.Tr(L.K.TabConnection) };
             _createTab = new Button(() => SelectTab(Tab.Create)) { text = L.Tr(L.K.TabCreate) };
             _resolveTab = new Button(() => SelectTab(Tab.Resolve)) { text = L.Tr(L.K.TabResolve) };
+            _agentTab = new Button(() => SelectTab(Tab.Agent)) { text = L.Tr(L.K.TabAgent) };
             _settingsTab = new Button(() => SelectTab(Tab.Settings)) { text = L.Tr(L.K.TabSettings) };
             _createTab.style.display = DisplayStyle.None;
             _resolveTab.style.display = DisplayStyle.None;
 
+            // The agent works on the repository, not on Jira, so it stays reachable
+            // even without a validated connection.
             bar.Add(_connectionTab);
             bar.Add(_createTab);
             bar.Add(_resolveTab);
+            bar.Add(_agentTab);
             bar.Add(_settingsTab);
             rootVisualElement.Add(bar);
         }
@@ -566,23 +582,27 @@ namespace OxenteGames.JiraCommunication
 
             _activeTab = tab;
             if (_connectionPanel == null || _createPanel == null ||
-                _resolvePanel == null || _settingsPanel == null)
+                _resolvePanel == null || _settingsPanel == null || _agentPanel == null)
                 return;
 
             _connectionPanel.style.display = tab == Tab.Connection ? DisplayStyle.Flex : DisplayStyle.None;
             _createPanel.style.display = tab == Tab.Create ? DisplayStyle.Flex : DisplayStyle.None;
             _resolvePanel.style.display = tab == Tab.Resolve ? DisplayStyle.Flex : DisplayStyle.None;
+            _agentPanel.style.display = tab == Tab.Agent ? DisplayStyle.Flex : DisplayStyle.None;
             _settingsPanel.style.display = tab == Tab.Settings ? DisplayStyle.Flex : DisplayStyle.None;
 
             JiraStyles.ApplyTab(_connectionTab, tab == Tab.Connection);
             JiraStyles.ApplyTab(_createTab, tab == Tab.Create);
             JiraStyles.ApplyTab(_resolveTab, tab == Tab.Resolve);
+            JiraStyles.ApplyTab(_agentTab, tab == Tab.Agent);
             JiraStyles.ApplyTab(_settingsTab, tab == Tab.Settings);
 
             if (tab == Tab.Create)
                 RefreshCreateAvailability();
             else if (tab == Tab.Resolve)
                 RefreshResolveAvailability();
+            else if (tab == Tab.Agent)
+                _agentConsole?.OnShow();
         }
 
         // --- Resolve panel -------------------------------------------------
@@ -896,6 +916,18 @@ namespace OxenteGames.JiraCommunication
             openButton.name = "resolve-open";
             openButton.style.marginTop = 0;
             _resolveDetailBody.Add(openButton);
+
+            // Outside the Git card on purpose: that card is hidden when the Git
+            // integration is off, and handing an issue to the agent does not need it.
+            var sendToAgentButton = new Button(SendCurrentIssueToAgent)
+            {
+                text = L.Tr(L.K.BtnAgentSendToAgent)
+            };
+            JiraStyles.ApplySecondaryButton(sendToAgentButton);
+            sendToAgentButton.style.alignSelf = Align.FlexStart;
+            sendToAgentButton.style.marginTop = 4;
+            sendToAgentButton.style.marginBottom = 4;
+            _resolveDetailBody.Add(sendToAgentButton);
 
             _resolveDetailBody.Add(BuildResolveGitCard());
 
@@ -6853,6 +6885,48 @@ namespace OxenteGames.JiraCommunication
         }
 
         // --- Settings panel -------------------------------------------------
+
+        // --- Agent panel ---------------------------------------------------
+
+        private VisualElement BuildAgentPanel()
+        {
+            _agentConsole = new AgentConsoleView(Repaint);
+            return _agentConsole.Build();
+        }
+
+        /// <summary>
+        /// Hands the currently open issue to the agent tab.
+        /// </summary>
+        /// <remarks>
+        /// This is the workflow the feature exists for: the developer is already
+        /// looking at an issue here, so the agent should start with its key, summary,
+        /// description and the branch name the team convention produces, instead of
+        /// having that retyped.
+        /// </remarks>
+        private void SendCurrentIssueToAgent()
+        {
+            if (_selectedIssue == null)
+                return;
+
+            string issueKey = _selectedIssue.key ?? string.Empty;
+            string summary = _selectedIssue.Summary;
+
+            // The description lives in the edit field rather than on the list model,
+            // which also means any local edit is what gets sent.
+            string description = _resolveDescriptionField?.value ?? string.Empty;
+
+            string branch = GitConventions.BuildBranch(
+                JiraPreferences.GitBranchTemplate, CurrentGitType(), issueKey, summary);
+
+            SelectTab(Tab.Agent);
+            _agentConsole?.SetIssueContext(issueKey, summary, description, branch);
+        }
+
+        private void OnDisable()
+        {
+            _agentConsole?.Dispose();
+            _agentConsole = null;
+        }
 
         private VisualElement BuildSettingsPanel()
         {

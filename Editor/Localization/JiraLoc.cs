@@ -578,6 +578,115 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.MsgGitBranchFailed] = new[] { "Falha no git: {0}", "Git error: {0}" },
             [K.MsgGitCopiedCommit] = new[] { "Mensagem de commit copiada.", "Commit message copied." },
             [K.MsgGitCopiedBranch] = new[] { "Nome do branch copiado.", "Branch name copied." },
+
+            // --- Local agent ---
+
+            [K.TabAgent] = new[] { "Agente", "Agent" },
+            [K.AgentSectionTitle] = new[] { "Agente local", "Local agent" },
+            [K.AgentIntro] = new[]
+            {
+                "Descreva a tarefa e o agente trabalha no repositório deste projeto. A execução acontece "
+                + "em background e o progresso aparece abaixo; você pode recompilar ou fechar o Unity sem perder a execução.",
+                "Describe the task and the agent works on this project's repository. The run happens in the "
+                + "background and progress shows below; you can recompile or close Unity without losing the run."
+            },
+            [K.AgentTaskLabel] = new[] { "Tarefa", "Task" },
+            [K.AgentTaskPlaceholder] = new[]
+            {
+                "Ex.: investigue por que o autoplay não para no fim da rodada e proponha a correção.",
+                "E.g.: investigate why autoplay does not stop at the end of the round and propose a fix."
+            },
+            [K.AgentIssueLabel] = new[] { "Atividade vinculada", "Linked issue" },
+            [K.AgentNoIssue] = new[] { "Nenhuma (tarefa livre)", "None (free task)" },
+            [K.BtnAgentRun] = new[] { "Executar em background", "Run in background" },
+            [K.BtnAgentRunning] = new[] { "Executando...", "Running..." },
+            [K.BtnAgentTerminal] = new[] { "Abrir no terminal", "Open in terminal" },
+            [K.BtnAgentCancel] = new[] { "Cancelar execução", "Cancel run" },
+            [K.BtnAgentRefresh] = new[] { "Recarregar", "Reload" },
+            [K.BtnAgentDelete] = new[] { "Excluir", "Delete" },
+            [K.BtnAgentCopyResult] = new[] { "Copiar resultado", "Copy result" },
+            [K.BtnAgentOpenFolder] = new[] { "Abrir pasta da execução", "Open run folder" },
+            [K.BtnAgentSendToAgent] = new[] { "Enviar para o agente", "Send to agent" },
+
+            [K.AgentPermissionLabel] = new[] { "Permissões", "Permissions" },
+            [K.AgentPermissionPlan] = new[] { "Somente leitura (investigar)", "Read-only (investigate)" },
+            [K.AgentPermissionDefault] = new[] { "Padrão da CLI (pergunta ao editar)", "CLI default (asks before editing)" },
+            [K.AgentPermissionAcceptEdits] = new[] { "Editar arquivos sem perguntar", "Edit files without asking" },
+            [K.AgentPermissionNote] = new[]
+            {
+                "Em background ninguém responde a uma pergunta de permissão: no modo padrão o agente "
+                + "para ao precisar editar. Use “Editar arquivos sem perguntar” para uma execução que deve alterar o projeto.",
+                "In a background run nobody can answer a permission prompt: in the default mode the agent "
+                + "stops when it needs to edit. Use “Edit files without asking” for a run that is meant to change the project."
+            },
+
+            [K.AgentCliTitle] = new[] { "CLI do agente", "Agent CLI" },
+            [K.AgentCliFound] = new[] { "{0} encontrado: {1}", "{0} found: {1}" },
+            [K.AgentCliMissing] = new[]
+            {
+                "{0} não encontrado nesta máquina. Instale a CLI para usar o agente.",
+                "{0} was not found on this machine. Install the CLI to use the agent."
+            },
+            [K.AgentCliOverrideMissing] = new[]
+            {
+                "O caminho informado não existe: {0}",
+                "The configured path does not exist: {0}"
+            },
+            [K.AgentCliChecking] = new[] { "Verificando a CLI...", "Checking the CLI..." },
+            [K.AgentCliPathLabel] = new[] { "Caminho da CLI (opcional)", "CLI path (optional)" },
+            [K.AgentCliPathHint] = new[]
+            {
+                "Deixe vazio para detecção automática. Preencha se o Unity não herdar o PATH do seu shell.",
+                "Leave empty for auto-detection. Fill it in when Unity does not inherit your shell PATH."
+            },
+            [K.BtnAgentCheckCli] = new[] { "Verificar novamente", "Check again" },
+            [K.BtnAgentInstallCli] = new[] { "Como instalar", "How to install" },
+            [K.BtnAgentCopyInstall] = new[] { "Copiar comando", "Copy command" },
+            [K.MsgAgentInstallCopied] = new[] { "Comando de instalação copiado.", "Install command copied." },
+
+            [K.AgentSkillTitle] = new[] { "Instruções do projeto", "Project instructions" },
+            [K.AgentSkillNote] = new[]
+            {
+                "Gera as instruções do projeto para o agente: convenção de branch e commit, cuidados com "
+                + ".meta, prefabs e cenas, e como o resultado volta para esta janela. Nenhum token é gravado no arquivo.",
+                "Generates the project instructions for the agent: branch and commit conventions, care with "
+                + ".meta files, prefabs and scenes, and how the result comes back to this window. No token is written to the file."
+            },
+            [K.BtnAgentInstallSkill] = new[] { "Gerar / atualizar", "Generate / update" },
+            [K.BtnAgentPreviewSkill] = new[] { "Ver conteúdo", "Preview" },
+            [K.MsgAgentSkillInstalled] = new[] { "Instruções gravadas em {0}", "Instructions written to {0}" },
+            [K.MsgAgentSkillFailed] = new[] { "Não foi possível gravar: {0}", "Could not write: {0}" },
+            [K.MsgAgentSkillPresent] = new[] { "Instaladas em {0}", "Installed at {0}" },
+            [K.MsgAgentSkillAbsent] = new[] { "Ainda não geradas neste repositório.", "Not generated in this repository yet." },
+
+            [K.AgentRunsTitle] = new[] { "Execuções", "Runs" },
+            [K.AgentNoRuns] = new[] { "Nenhuma execução ainda.", "No runs yet." },
+            [K.AgentTranscriptTitle] = new[] { "Transcrição", "Transcript" },
+            [K.AgentResultTitle] = new[] { "Resultado", "Result" },
+            [K.AgentWaitingFirstEvent] = new[]
+            {
+                "Aguardando o primeiro evento da CLI...",
+                "Waiting for the first event from the CLI..."
+            },
+
+            [K.AgentStatusRunning] = new[] { "Executando", "Running" },
+            [K.AgentStatusSucceeded] = new[] { "Concluído", "Done" },
+            [K.AgentStatusFailed] = new[] { "Falhou", "Failed" },
+            [K.AgentStatusCanceled] = new[] { "Cancelado", "Canceled" },
+            [K.AgentStatusOrphaned] = new[] { "Interrompido", "Interrupted" },
+
+            [K.AgentEventThinking] = new[] { "pensando", "thinking" },
+            [K.AgentEventTool] = new[] { "ferramenta", "tool" },
+            [K.AgentEventStarted] = new[] { "sessão iniciada", "session started" },
+            [K.AgentEventError] = new[] { "erro", "error" },
+
+            [K.AgentMetaCost] = new[] { "custo US$ {0}", "cost US$ {0}" },
+            [K.AgentMetaDuration] = new[] { "{0} s", "{0} s" },
+            [K.MsgAgentNoTask] = new[] { "Descreva a tarefa antes de executar.", "Describe the task before running." },
+            [K.MsgAgentStartFailed] = new[] { "Não foi possível iniciar: {0}", "Could not start: {0}" },
+            [K.MsgAgentTerminalFailed] = new[] { "Não foi possível abrir o terminal: {0}", "Could not open the terminal: {0}" },
+            [K.MsgAgentCopied] = new[] { "Resultado copiado.", "Result copied." },
+            [K.MsgAgentWorkingDir] = new[] { "Pasta de trabalho: {0}", "Working directory: {0}" },
         };
 
         internal static class K
@@ -875,6 +984,70 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgGitBranchFailed = "MsgGitBranchFailed";
             public const string MsgGitCopiedCommit = "MsgGitCopiedCommit";
             public const string MsgGitCopiedBranch = "MsgGitCopiedBranch";
+
+            // --- Local agent ---
+
+            public const string TabAgent = "TabAgent";
+            public const string AgentSectionTitle = "AgentSectionTitle";
+            public const string AgentIntro = "AgentIntro";
+            public const string AgentTaskLabel = "AgentTaskLabel";
+            public const string AgentTaskPlaceholder = "AgentTaskPlaceholder";
+            public const string AgentIssueLabel = "AgentIssueLabel";
+            public const string AgentNoIssue = "AgentNoIssue";
+            public const string BtnAgentRun = "BtnAgentRun";
+            public const string BtnAgentRunning = "BtnAgentRunning";
+            public const string BtnAgentTerminal = "BtnAgentTerminal";
+            public const string BtnAgentCancel = "BtnAgentCancel";
+            public const string BtnAgentRefresh = "BtnAgentRefresh";
+            public const string BtnAgentDelete = "BtnAgentDelete";
+            public const string BtnAgentCopyResult = "BtnAgentCopyResult";
+            public const string BtnAgentOpenFolder = "BtnAgentOpenFolder";
+            public const string BtnAgentSendToAgent = "BtnAgentSendToAgent";
+            public const string AgentPermissionLabel = "AgentPermissionLabel";
+            public const string AgentPermissionPlan = "AgentPermissionPlan";
+            public const string AgentPermissionDefault = "AgentPermissionDefault";
+            public const string AgentPermissionAcceptEdits = "AgentPermissionAcceptEdits";
+            public const string AgentPermissionNote = "AgentPermissionNote";
+            public const string AgentCliTitle = "AgentCliTitle";
+            public const string AgentCliFound = "AgentCliFound";
+            public const string AgentCliMissing = "AgentCliMissing";
+            public const string AgentCliOverrideMissing = "AgentCliOverrideMissing";
+            public const string AgentCliChecking = "AgentCliChecking";
+            public const string AgentCliPathLabel = "AgentCliPathLabel";
+            public const string AgentCliPathHint = "AgentCliPathHint";
+            public const string BtnAgentCheckCli = "BtnAgentCheckCli";
+            public const string BtnAgentInstallCli = "BtnAgentInstallCli";
+            public const string BtnAgentCopyInstall = "BtnAgentCopyInstall";
+            public const string MsgAgentInstallCopied = "MsgAgentInstallCopied";
+            public const string AgentSkillTitle = "AgentSkillTitle";
+            public const string AgentSkillNote = "AgentSkillNote";
+            public const string BtnAgentInstallSkill = "BtnAgentInstallSkill";
+            public const string BtnAgentPreviewSkill = "BtnAgentPreviewSkill";
+            public const string MsgAgentSkillInstalled = "MsgAgentSkillInstalled";
+            public const string MsgAgentSkillFailed = "MsgAgentSkillFailed";
+            public const string MsgAgentSkillPresent = "MsgAgentSkillPresent";
+            public const string MsgAgentSkillAbsent = "MsgAgentSkillAbsent";
+            public const string AgentRunsTitle = "AgentRunsTitle";
+            public const string AgentNoRuns = "AgentNoRuns";
+            public const string AgentTranscriptTitle = "AgentTranscriptTitle";
+            public const string AgentResultTitle = "AgentResultTitle";
+            public const string AgentWaitingFirstEvent = "AgentWaitingFirstEvent";
+            public const string AgentStatusRunning = "AgentStatusRunning";
+            public const string AgentStatusSucceeded = "AgentStatusSucceeded";
+            public const string AgentStatusFailed = "AgentStatusFailed";
+            public const string AgentStatusCanceled = "AgentStatusCanceled";
+            public const string AgentStatusOrphaned = "AgentStatusOrphaned";
+            public const string AgentEventThinking = "AgentEventThinking";
+            public const string AgentEventTool = "AgentEventTool";
+            public const string AgentEventStarted = "AgentEventStarted";
+            public const string AgentEventError = "AgentEventError";
+            public const string AgentMetaCost = "AgentMetaCost";
+            public const string AgentMetaDuration = "AgentMetaDuration";
+            public const string MsgAgentNoTask = "MsgAgentNoTask";
+            public const string MsgAgentStartFailed = "MsgAgentStartFailed";
+            public const string MsgAgentTerminalFailed = "MsgAgentTerminalFailed";
+            public const string MsgAgentCopied = "MsgAgentCopied";
+            public const string MsgAgentWorkingDir = "MsgAgentWorkingDir";
         }
     }
 }

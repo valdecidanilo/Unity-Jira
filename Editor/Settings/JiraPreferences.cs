@@ -21,6 +21,8 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AiTokenKey = BaseKey + "Ai.Token";
         private const string AiModelKey = BaseKey + "Ai.Model";
         private const string AiProviderKey = BaseKey + "Ai.Provider";
+        private const string AgentCliPathKey = BaseKey + "Agent.CliPath";
+        private const string AgentPermissionKey = BaseKey + "Agent.Permission";
         private const string GitEnabledKey = BaseKey + "Git.Enabled";
         private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
         private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
@@ -163,6 +165,38 @@ namespace OxenteGames.JiraCommunication.Settings
         public static void SetAiModel(string provider, string value)
         {
             EditorPrefs.SetString(AiModelKey + "." + provider, value ?? string.Empty);
+        }
+
+        // --- Local agent (CLI) integration ---
+        // No credential is stored here: the agent CLI authenticates with the account
+        // the developer already logged into, so unlike the HTTP drafting path above
+        // there is no token for this feature to keep.
+
+        /// <summary>
+        /// Explicit path to a provider's CLI. Empty means auto-discovery, which is the
+        /// normal case; this exists for installs that discovery cannot see, such as a
+        /// Unity launched from Finder that never inherited the user's shell PATH.
+        /// </summary>
+        public static string GetAgentCliPath(string provider)
+        {
+            return EditorPrefs.GetString(AgentCliPathKey + "." + provider, string.Empty);
+        }
+
+        public static void SetAgentCliPath(string provider, string value)
+        {
+            EditorPrefs.SetString(AgentCliPathKey + "." + provider, value ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Permission posture for headless runs. Defaults to the read-only "plan"
+        /// posture so that enabling the feature cannot silently modify the project
+        /// before the developer has chosen to allow it.
+        /// </summary>
+        public static string AgentPermission
+        {
+            get => EditorPrefs.GetString(AgentPermissionKey, Agents.AgentPermission.Plan);
+            set => EditorPrefs.SetString(AgentPermissionKey,
+                string.IsNullOrEmpty(value) ? Agents.AgentPermission.Plan : value);
         }
 
         // --- Git / GitHub integration ---
