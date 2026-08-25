@@ -123,11 +123,23 @@ e roda comandos.
 
 ### Como usar
 
-1. Instale a CLI do provedor escolhido em `Configurações → Assistente de IA`:
+1. Tenha a CLI do provedor escolhido em `Configurações → Assistente de IA`.
+
+   **Se você usa o app desktop do Claude, provavelmente não precisa instalar nada.**
+   O app já traz um `claude` completo em
+   `%APPDATA%\Claude\claude-code\<versão>\claude.exe` (macOS:
+   `~/Library/Application Support/Claude/claude-code/<versão>/claude`) — só não o
+   coloca no PATH. O package procura ali e usa a versão mais nova.
+
+   Se preferir a CLI no PATH, ou usar Codex:
    - Claude Code: `npm install -g @anthropic-ai/claude-code`
    - Codex: `npm install -g @openai/codex`
-2. Abra `Jira → Jira Workspace → Agente`. O card **CLI do agente** mostra se ela
-   foi encontrada; se o Unity não herdar o PATH do seu shell, informe o caminho
+
+   A ordem de busca é: caminho informado manualmente → PATH → instalações
+   conhecidas (npm etc.) → bundle do app desktop. Uma CLI que **você** instalou
+   sempre ganha da cópia gerenciada pelo app, cuja pasta muda a cada atualização.
+2. Abra `Jira → Jira Workspace → Agente`. O card **CLI do agente** mostra qual
+   binário foi encontrado e a versão; se nada aparecer, informe o caminho
    manualmente.
 3. Clique em **Gerar / atualizar** em *Instruções do projeto*. Isso escreve a
    convenção de branch/commit configurada e os cuidados de Unity em:
@@ -161,6 +173,26 @@ nem perde uma execução, e a transcrição fica disponível para replay depois.
 
 O botão **Abrir no terminal** existe para uma sessão interativa; ela
 deliberadamente **não** entra no histórico, porque não há stream para acompanhar.
+
+### Custo: continuar em vez de recomeçar
+
+Cada execução nova é uma sessão nova — paga o contexto inicial inteiro de novo.
+Para um próximo passo sobre o mesmo trabalho, escreva a instrução no campo
+**Tarefa** e use **Continuar esta execução** na transcrição: o prompt enviado é só
+a instrução, e a sessão retomada já tem o enquadramento e tudo que o agente leu.
+
+O botão fica ativo quando a execução terminou e reportou um id de sessão. Codex
+não aparece aqui: `codex exec` não tem flag de retomada, e o package prefere
+esconder a ação a emitir uma flag que a CLI recusaria.
+
+O dropdown **Modelo** permite fixar um modelo mais barato para tarefas mecânicas.
+O padrão é **“Padrão da CLI”**, que não envia `--model` — o package não sobrescreve
+a sua configuração sem você pedir. Uma execução continuada mantém o modelo da
+sessão original; trocar no meio descartaria o contexto que se quis reaproveitar.
+
+Vale notar que o package tem **dois caminhos de cobrança distintos**: o assistente
+de IA (`IAiIssueClient`) usa a sua API key e é medido por token; o agente usa a
+CLI, que pode estar na sua assinatura. Contas diferentes, mesma janela.
 
 ### Credenciais
 

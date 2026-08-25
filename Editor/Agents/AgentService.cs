@@ -250,6 +250,8 @@ namespace OxenteGames.JiraCommunication.Agents
                 Provider = request.Provider,
                 Title = request.Title,
                 IssueKey = request.IssueKey,
+                Model = request.Model ?? string.Empty,
+                ResumedFrom = request.ResumeSessionId ?? string.Empty,
                 StartedAtUtc = startedAt,
                 ProcessId = pid,
                 Status = AgentRunStatus.Running

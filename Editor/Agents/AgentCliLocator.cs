@@ -173,6 +173,81 @@ namespace OxenteGames.JiraCommunication.Agents
             return result.Success ? result.FirstLine : string.Empty;
         }
 
+        /// <summary>
+        /// CLI binaries shipped inside the Claude desktop app, newest version first.
+        /// </summary>
+        /// <remarks>
+        /// The desktop app bundles a full <c>claude</c> binary under a versioned
+        /// directory but does not put it on PATH, so a developer who installed only
+        /// the app has a working CLI that nothing can find. Probing here means the
+        /// agent tab works for them with no extra install.
+        /// <para>
+        /// This is a fallback, deliberately ordered after PATH: a CLI the developer
+        /// installed themselves should always win over an app-managed copy, whose
+        /// directory churns on every app update.
+        /// </para>
+        /// </remarks>
+        private static List<string> DesktopAppBundles(string command)
+        {
+            var found = new List<string>();
+
+            try
+            {
+                string root;
+
+                if (AgentShell.IsWindows)
+                {
+                    string appData = Environment.GetEnvironmentVariable("APPDATA");
+                    if (string.IsNullOrEmpty(appData))
+                        return found;
+                    root = Path.Combine(Path.Combine(appData, "Claude"), "claude-code");
+                }
+                else
+                {
+                    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    if (string.IsNullOrEmpty(home))
+                        return found;
+                    root = Path.Combine(home, "Library/Application Support/Claude/claude-code");
+                }
+
+                if (!Directory.Exists(root))
+                    return found;
+
+                string executable = AgentShell.IsWindows ? command + ".exe" : command;
+                var versions = new List<string>(Directory.GetDirectories(root));
+
+                // Newest first, comparing as versions so 2.1.10 sorts above 2.1.9.
+                versions.Sort((left, right) => CompareVersionDirs(right, left));
+
+                foreach (string directory in versions)
+                {
+                    string candidate = Path.Combine(directory, executable);
+                    if (File.Exists(candidate))
+                        found.Add(candidate);
+                }
+            }
+            catch (Exception)
+            {
+                // An unreadable app directory just means no candidates from here.
+            }
+
+            return found;
+        }
+
+        private static int CompareVersionDirs(string left, string right)
+        {
+            string leftName = Path.GetFileName(left) ?? string.Empty;
+            string rightName = Path.GetFileName(right) ?? string.Empty;
+
+            if (Version.TryParse(leftName, out Version leftVersion) &&
+                Version.TryParse(rightName, out Version rightVersion))
+            {
+                return leftVersion.CompareTo(rightVersion);
+            }
+
+            return string.Compare(leftName, rightName, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static IEnumerable<string> WellKnownPaths(string command)
         {
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -200,6 +275,10 @@ namespace OxenteGames.JiraCommunication.Agents
                     yield return Path.Combine(home, "." + command, "local", command + ".exe");
                 }
 
+                // Last: the copy the desktop app manages for itself.
+                foreach (string bundled in DesktopAppBundles(command))
+                    yield return bundled;
+
                 yield break;
             }
 
@@ -214,6 +293,9 @@ namespace OxenteGames.JiraCommunication.Agents
             yield return "/opt/homebrew/bin/" + command;
             yield return "/usr/local/bin/" + command;
             yield return "/usr/bin/" + command;
+
+            foreach (string bundled in DesktopAppBundles(command))
+                yield return bundled;
         }
 
         private static string Quote(string value)

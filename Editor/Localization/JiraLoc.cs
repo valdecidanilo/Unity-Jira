@@ -687,6 +687,36 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.MsgAgentTerminalFailed] = new[] { "Não foi possível abrir o terminal: {0}", "Could not open the terminal: {0}" },
             [K.MsgAgentCopied] = new[] { "Resultado copiado.", "Result copied." },
             [K.MsgAgentWorkingDir] = new[] { "Pasta de trabalho: {0}", "Working directory: {0}" },
+
+            [K.AgentModelLabel] = new[] { "Modelo", "Model" },
+            [K.AgentModelCliDefault] = new[] { "Padrão da CLI", "CLI default" },
+            [K.AgentModelNote] = new[]
+            {
+                "“Padrão da CLI” não envia --model e mantém o que você configurou na CLI. "
+                + "Um modelo mais barato serve bem para tarefas mecânicas.",
+                "“CLI default” sends no --model and keeps whatever you configured in the CLI. "
+                + "A cheaper model works well for mechanical tasks."
+            },
+
+            [K.BtnAgentContinue] = new[] { "Continuar esta execução", "Continue this run" },
+            [K.AgentContinueNote] = new[]
+            {
+                "Continuar reaproveita o contexto da sessão anterior, em vez de pagar tudo de novo. "
+                + "Escreva o próximo passo no campo Tarefa e clique aqui.",
+                "Continuing reuses the previous session's context instead of paying for it again. "
+                + "Write the next step in the Task field and click here."
+            },
+            [K.AgentContinueUnavailable] = new[]
+            {
+                "Esta execução não pode ser continuada (sem id de sessão ou provedor sem suporte).",
+                "This run cannot be continued (no session id, or the provider does not support it)."
+            },
+            [K.MsgAgentNoFollowUp] = new[]
+            {
+                "Escreva o próximo passo no campo Tarefa antes de continuar.",
+                "Write the next step in the Task field before continuing."
+            },
+            [K.AgentResumedFrom] = new[] { "continuação de {0}", "continued from {0}" },
         };
 
         internal static class K
@@ -1048,6 +1078,14 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAgentTerminalFailed = "MsgAgentTerminalFailed";
             public const string MsgAgentCopied = "MsgAgentCopied";
             public const string MsgAgentWorkingDir = "MsgAgentWorkingDir";
+            public const string AgentModelLabel = "AgentModelLabel";
+            public const string AgentModelCliDefault = "AgentModelCliDefault";
+            public const string AgentModelNote = "AgentModelNote";
+            public const string BtnAgentContinue = "BtnAgentContinue";
+            public const string AgentContinueNote = "AgentContinueNote";
+            public const string AgentContinueUnavailable = "AgentContinueUnavailable";
+            public const string MsgAgentNoFollowUp = "MsgAgentNoFollowUp";
+            public const string AgentResumedFrom = "AgentResumedFrom";
         }
     }
 }

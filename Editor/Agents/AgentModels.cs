@@ -124,6 +124,70 @@ namespace OxenteGames.JiraCommunication.Agents
 
         /// <summary>Resume an existing CLI session instead of starting fresh. Optional.</summary>
         public string ResumeSessionId = string.Empty;
+
+        /// <summary>
+        /// CLI model id, or empty to leave the CLI's own configuration alone.
+        /// See <see cref="AgentModelCatalog"/>.
+        /// </summary>
+        public string Model = AgentModelCatalog.CliDefault;
+    }
+
+    /// <summary>
+    /// Models offered per provider, as CLI model identifiers.
+    /// </summary>
+    /// <remarks>
+    /// The first entry is always <see cref="CliDefault"/> (empty), which means "do not
+    /// pass --model at all". That has to be the default: the developer already
+    /// configured a model in the CLI, and a package that silently overrides it would
+    /// be changing behavior they did not ask us to change.
+    /// <para>
+    /// Codex intentionally offers only the default. Its model identifiers are not
+    /// something this package should guess at — extending the array is a one-line
+    /// change once they are known.
+    /// </para>
+    /// </remarks>
+    internal static class AgentModelCatalog
+    {
+        /// <summary>Sentinel meaning "leave the CLI's own model configuration alone".</summary>
+        public const string CliDefault = "";
+
+        private static readonly string[] ClaudeModels =
+        {
+            CliDefault,
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-haiku-4-5"
+        };
+
+        private static readonly string[] CodexModels = { CliDefault };
+
+        public static string[] Ids(string provider)
+        {
+            return provider == AgentProvider.Codex ? CodexModels : ClaudeModels;
+        }
+
+        /// <summary>True when this provider offers a real choice beyond the default.</summary>
+        public static bool HasChoices(string provider)
+        {
+            return Ids(provider).Length > 1;
+        }
+
+        /// <summary>Normalizes a stored value back to a known id, or to the default.</summary>
+        public static string Sanitize(string provider, string model)
+        {
+            if (string.IsNullOrWhiteSpace(model))
+                return CliDefault;
+
+            foreach (string id in Ids(provider))
+            {
+                if (id == model)
+                    return id;
+            }
+
+            // A model the catalog no longer lists: fall back rather than pass an id the
+            // CLI would reject.
+            return CliDefault;
+        }
     }
 
     /// <summary>
@@ -155,7 +219,19 @@ namespace OxenteGames.JiraCommunication.Agents
         public string Provider = AgentProvider.ClaudeCode;
         public string Title = string.Empty;
         public string IssueKey = string.Empty;
+
+        /// <summary>
+        /// CLI session id reported by the run, and the handle used to continue it.
+        /// Empty until the CLI emits its init event.
+        /// </summary>
         public string SessionId = string.Empty;
+
+        /// <summary>Session this run continued from, when it was a follow-up.</summary>
+        public string ResumedFrom = string.Empty;
+
+        /// <summary>Model this run was pinned to, or empty for the CLI default.</summary>
+        public string Model = string.Empty;
+
         public DateTime StartedAtUtc;
         public int ProcessId;
         public AgentRunStatus Status = AgentRunStatus.Running;
@@ -174,6 +250,12 @@ namespace OxenteGames.JiraCommunication.Agents
         public double CostUsd;
 
         public bool IsRunning => Status == AgentRunStatus.Running;
+
+        /// <summary>
+        /// True when this run can be continued. Requires a session id, which only
+        /// exists once the CLI reported one, and a run that is no longer live.
+        /// </summary>
+        public bool CanContinue => !IsRunning && !string.IsNullOrWhiteSpace(SessionId);
 
         public string DisplayTitle =>
             !string.IsNullOrWhiteSpace(Title) ? Title :

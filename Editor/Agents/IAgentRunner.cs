@@ -18,6 +18,14 @@ namespace OxenteGames.JiraCommunication.Agents
         string Provider { get; }
 
         /// <summary>
+        /// True when this CLI can continue a previous session from
+        /// <see cref="AgentRequest.ResumeSessionId"/> in headless mode. The UI hides
+        /// the continue action when false rather than emitting a flag the CLI would
+        /// reject.
+        /// </summary>
+        bool SupportsResume { get; }
+
+        /// <summary>
         /// The command line that runs the agent headlessly, emitting one JSON event per
         /// line on stdout. Redirection is added by <see cref="AgentScript"/>.
         /// </summary>

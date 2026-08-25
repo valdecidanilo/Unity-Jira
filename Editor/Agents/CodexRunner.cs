@@ -17,6 +17,9 @@ namespace OxenteGames.JiraCommunication.Agents
     {
         public string Provider => AgentProvider.Codex;
 
+        // "codex exec" has no resume flag; continuing is a separate subcommand.
+        public bool SupportsResume => false;
+
         public string BuildCommandLine(AgentRequest request)
         {
             var sb = new StringBuilder(256);
@@ -26,6 +29,13 @@ namespace OxenteGames.JiraCommunication.Agents
             // from stdin, which the launcher redirects from prompt.txt.
             sb.Append(" exec --json");
             sb.Append(' ').Append(MapSandbox(request.PermissionMode));
+
+            if (!string.IsNullOrWhiteSpace(request.Model))
+                sb.Append(" --model ").Append(AgentScript.Quote(request.Model));
+
+            // Codex resumes by session id through its own subcommand rather than a
+            // flag on exec, so a follow-up is not expressible here yet. The UI hides
+            // the continue action for this provider instead of emitting a wrong flag.
             sb.Append(" -");
 
             return sb.ToString();
@@ -33,7 +43,13 @@ namespace OxenteGames.JiraCommunication.Agents
 
         public string BuildInteractiveCommandLine(AgentRequest request)
         {
-            return AgentScript.Quote(Executable(request));
+            var sb = new StringBuilder(128);
+            sb.Append(AgentScript.Quote(Executable(request)));
+
+            if (!string.IsNullOrWhiteSpace(request.Model))
+                sb.Append(" --model ").Append(AgentScript.Quote(request.Model));
+
+            return sb.ToString();
         }
 
         private static string Executable(AgentRequest request)

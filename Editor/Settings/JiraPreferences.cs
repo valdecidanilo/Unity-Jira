@@ -23,6 +23,7 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AiProviderKey = BaseKey + "Ai.Provider";
         private const string AgentCliPathKey = BaseKey + "Agent.CliPath";
         private const string AgentPermissionKey = BaseKey + "Agent.Permission";
+        private const string AgentModelKey = BaseKey + "Agent.Model";
         private const string GitEnabledKey = BaseKey + "Git.Enabled";
         private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
         private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
@@ -197,6 +198,22 @@ namespace OxenteGames.JiraCommunication.Settings
             get => EditorPrefs.GetString(AgentPermissionKey, Agents.AgentPermission.Plan);
             set => EditorPrefs.SetString(AgentPermissionKey,
                 string.IsNullOrEmpty(value) ? Agents.AgentPermission.Plan : value);
+        }
+
+        /// <summary>
+        /// CLI model override for headless runs, per provider. Empty — the default —
+        /// means no <c>--model</c> flag is passed, so the CLI keeps whatever the
+        /// developer configured. Stored per provider because the identifiers are not
+        /// interchangeable between CLIs.
+        /// </summary>
+        public static string GetAgentModel(string provider)
+        {
+            return EditorPrefs.GetString(AgentModelKey + "." + provider, string.Empty);
+        }
+
+        public static void SetAgentModel(string provider, string value)
+        {
+            EditorPrefs.SetString(AgentModelKey + "." + provider, value ?? string.Empty);
         }
 
         // --- Git / GitHub integration ---

@@ -16,6 +16,8 @@ namespace OxenteGames.JiraCommunication.Agents
     {
         public string Provider => AgentProvider.ClaudeCode;
 
+        public bool SupportsResume => true;
+
         public string BuildCommandLine(AgentRequest request)
         {
             var sb = new StringBuilder(256);
@@ -25,6 +27,11 @@ namespace OxenteGames.JiraCommunication.Agents
             // which is what turns the single final answer into per-step events.
             sb.Append(" -p --output-format stream-json --verbose");
             sb.Append(" --permission-mode ").Append(MapPermission(request.PermissionMode));
+
+            // Omitted entirely when empty, so the CLI keeps the model the developer
+            // configured. Passing a model is an explicit override, never a default.
+            if (!string.IsNullOrWhiteSpace(request.Model))
+                sb.Append(" --model ").Append(AgentScript.Quote(request.Model));
 
             if (!string.IsNullOrWhiteSpace(request.ResumeSessionId))
                 sb.Append(" --resume ").Append(AgentScript.Quote(request.ResumeSessionId));
@@ -36,6 +43,9 @@ namespace OxenteGames.JiraCommunication.Agents
         {
             var sb = new StringBuilder(128);
             sb.Append(AgentScript.Quote(Executable(request)));
+
+            if (!string.IsNullOrWhiteSpace(request.Model))
+                sb.Append(" --model ").Append(AgentScript.Quote(request.Model));
 
             if (!string.IsNullOrWhiteSpace(request.ResumeSessionId))
                 sb.Append(" --resume ").Append(AgentScript.Quote(request.ResumeSessionId));

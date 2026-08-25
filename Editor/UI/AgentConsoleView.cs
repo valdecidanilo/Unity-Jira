@@ -37,6 +37,7 @@ namespace OxenteGames.JiraCommunication.UI
         private TextField _taskField;
         private Label _issueLabel;
         private DropdownField _permissionDropdown;
+        private DropdownField _modelDropdown;
         private Button _runButton;
         private Button _terminalButton;
         private Label _taskStatus;
@@ -50,6 +51,7 @@ namespace OxenteGames.JiraCommunication.UI
         private Label _runMeta;
         private Label _resultLabel;
         private Button _cancelButton;
+        private Button _continueButton;
 
         private string _selectedRunId = string.Empty;
         private int _renderedEventCount;
@@ -385,6 +387,32 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyNote(permissionNote);
             card.Add(permissionNote);
 
+            // Only shown when the provider actually offers a choice; a dropdown with a
+            // single "default" entry would just be furniture.
+            if (AgentModelCatalog.HasChoices(Provider))
+            {
+                string[] modelIds = AgentModelCatalog.Ids(Provider);
+
+                _modelDropdown = new DropdownField(L.Tr(L.K.AgentModelLabel))
+                {
+                    choices = BuildModelLabels(modelIds)
+                };
+                _modelDropdown.index = Math.Max(0, Array.IndexOf(
+                    modelIds, AgentModelCatalog.Sanitize(Provider, JiraPreferences.GetAgentModel(Provider))));
+                JiraStyles.ApplyDropdown(_modelDropdown);
+                _modelDropdown.RegisterValueChangedCallback(_ =>
+                {
+                    int index = _modelDropdown.index;
+                    if (index >= 0 && index < modelIds.Length)
+                        JiraPreferences.SetAgentModel(Provider, modelIds[index]);
+                });
+                card.Add(_modelDropdown);
+
+                var modelNote = new Label(L.Tr(L.K.AgentModelNote));
+                JiraStyles.ApplyNote(modelNote);
+                card.Add(modelNote);
+            }
+
             _workingDirLabel = new Label();
             JiraStyles.ApplyFieldHint(_workingDirLabel);
             card.Add(_workingDirLabel);
@@ -409,6 +437,30 @@ namespace OxenteGames.JiraCommunication.UI
 
             UpdateRunButtonState();
             return card;
+        }
+
+        /// <summary>
+        /// Labels for the model dropdown. The default entry is translated; the rest are
+        /// shown as their raw CLI id, which keeps the list from going stale in a
+        /// package that ships ahead of model releases.
+        /// </summary>
+        private static List<string> BuildModelLabels(string[] modelIds)
+        {
+            var labels = new List<string>(modelIds.Length);
+
+            foreach (string id in modelIds)
+            {
+                labels.Add(string.IsNullOrWhiteSpace(id)
+                    ? L.Tr(L.K.AgentModelCliDefault)
+                    : id);
+            }
+
+            return labels;
+        }
+
+        private string SelectedModel()
+        {
+            return AgentModelCatalog.Sanitize(Provider, JiraPreferences.GetAgentModel(Provider));
         }
 
         private static int PermissionToIndex(string permission)
@@ -438,6 +490,7 @@ namespace OxenteGames.JiraCommunication.UI
 
             _runButton.SetEnabled(_cliReady);
             _terminalButton?.SetEnabled(_cliReady);
+            UpdateContinueButtonState();
         }
 
         private void SetTaskStatus(string message, bool success)
@@ -494,10 +547,68 @@ namespace OxenteGames.JiraCommunication.UI
                 WorkingDirectory = _workingDirectory,
                 IssueKey = _issueKey,
                 Title = AgentPrompt.BuildTitle(_issueKey, instruction),
-                PermissionMode = JiraPreferences.AgentPermission
+                PermissionMode = JiraPreferences.AgentPermission,
+                Model = SelectedModel()
             };
 
+            await LaunchAsync(request);
+        }
+
+        /// <summary>
+        /// Starts a follow-up turn on the selected run's session.
+        /// </summary>
+        /// <remarks>
+        /// The point of this path is cost: a resumed session already holds the project
+        /// framing and everything the agent read, so the follow-up prompt is only the
+        /// next instruction. Starting fresh instead would re-send and re-pay for all
+        /// of that context.
+        /// </remarks>
+        private async Task ContinueRunAsync()
+        {
+            AgentRunInfo source = AgentService.Find(_selectedRunId);
+            if (source == null || !source.CanContinue)
+            {
+                SetTaskStatus(L.Tr(L.K.AgentContinueUnavailable), false);
+                return;
+            }
+
+            string instruction = _taskField?.value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(instruction))
+            {
+                // Unlike a fresh run, there is no issue framing to fall back on — a
+                // follow-up with no instruction would say nothing.
+                SetTaskStatus(L.Tr(L.K.MsgAgentNoFollowUp), false);
+                return;
+            }
+
+            var request = new AgentRequest
+            {
+                Prompt = AgentPrompt.BuildFollowUp(instruction),
+                Provider = source.Provider,
+                WorkingDirectory = _workingDirectory,
+                IssueKey = source.IssueKey,
+                Title = AgentPrompt.BuildTitle(source.IssueKey, instruction),
+                PermissionMode = JiraPreferences.AgentPermission,
+
+                // Keep the resumed session on the model it started with; switching
+                // models mid-session would discard the cached context we are resuming for.
+                Model = source.Model ?? string.Empty,
+                ResumeSessionId = source.SessionId
+            };
+
+            await LaunchAsync(request);
+        }
+
+        private async Task LaunchAsync(AgentRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.WorkingDirectory))
+            {
+                await ResolveWorkingDirectoryAsync();
+                request.WorkingDirectory = _workingDirectory;
+            }
+
             _runButton?.SetEnabled(false);
+            _continueButton?.SetEnabled(false);
             if (_runButton != null)
                 _runButton.text = L.Tr(L.K.BtnAgentRunning);
 
@@ -513,6 +624,7 @@ namespace OxenteGames.JiraCommunication.UI
             if (run == null)
             {
                 SetTaskStatus(L.Tr(L.K.MsgAgentStartFailed, failure ?? "?"), false);
+                UpdateContinueButtonState();
                 return;
             }
 
@@ -715,6 +827,13 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyCompactButton(_cancelButton, true);
             row.Add(_cancelButton);
 
+            _continueButton = new Button(() => _ = ContinueRunAsync())
+            {
+                text = L.Tr(L.K.BtnAgentContinue)
+            };
+            JiraStyles.ApplyCompactButton(_continueButton, false);
+            row.Add(_continueButton);
+
             var copy = new Button(() =>
             {
                 AgentRunInfo run = AgentService.Find(_selectedRunId);
@@ -756,7 +875,28 @@ namespace OxenteGames.JiraCommunication.UI
             row.Add(delete);
 
             _transcriptCard.Add(row);
+
+            var continueNote = new Label(L.Tr(L.K.AgentContinueNote));
+            JiraStyles.ApplyNote(continueNote);
+            _transcriptCard.Add(continueNote);
+
             return _transcriptCard;
+        }
+
+        /// <summary>
+        /// A run can be continued only once it has finished and reported a session id,
+        /// and only on a CLI whose headless mode accepts a resume.
+        /// </summary>
+        private void UpdateContinueButtonState()
+        {
+            if (_continueButton == null)
+                return;
+
+            AgentRunInfo run = AgentService.Find(_selectedRunId);
+            bool providerSupports = run != null &&
+                                    AgentService.CreateRunner(run.Provider).SupportsResume;
+
+            _continueButton.SetEnabled(_cliReady && run != null && run.CanContinue && providerSupports);
         }
 
         private void RenderTranscript(AgentRunInfo run)
@@ -777,12 +917,14 @@ namespace OxenteGames.JiraCommunication.UI
                 _runMeta.text = string.Empty;
                 _resultLabel.style.display = DisplayStyle.None;
                 _cancelButton.SetEnabled(false);
+                UpdateContinueButtonState();
                 return;
             }
 
             _runHeader.text = StatusText(run.Status) + " · " + run.DisplayTitle;
             _runMeta.text = BuildMeta(run);
             _cancelButton.SetEnabled(run.IsRunning);
+            UpdateContinueButtonState();
 
             AppendNewEvents(run);
             RenderResult(run);
@@ -803,6 +945,12 @@ namespace OxenteGames.JiraCommunication.UI
                 parts.Add(L.Tr(L.K.AgentMetaCost,
                     run.CostUsd.ToString("0.0000", CultureInfo.InvariantCulture)));
             }
+
+            if (!string.IsNullOrWhiteSpace(run.Model))
+                parts.Add(run.Model);
+
+            if (!string.IsNullOrWhiteSpace(run.ResumedFrom))
+                parts.Add(L.Tr(L.K.AgentResumedFrom, run.ResumedFrom));
 
             if (!string.IsNullOrWhiteSpace(run.SessionId))
                 parts.Add(run.SessionId);
@@ -949,6 +1097,7 @@ namespace OxenteGames.JiraCommunication.UI
                 _runMeta.text = BuildMeta(selected);
                 _cancelButton.SetEnabled(selected.IsRunning);
                 RenderResult(selected);
+                UpdateContinueButtonState();
             }
 
             _repaint?.Invoke();
@@ -962,6 +1111,7 @@ namespace OxenteGames.JiraCommunication.UI
             AppendNewEvents(run);
             _runMeta.text = BuildMeta(run);
             RenderResult(run);
+            UpdateContinueButtonState();
             _repaint?.Invoke();
         }
     }

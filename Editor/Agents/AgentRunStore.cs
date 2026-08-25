@@ -168,6 +168,10 @@ namespace OxenteGames.JiraCommunication.Agents
             sb.Append(',');
             Append(sb, "executablePath", request.ExecutablePath);
             sb.Append(',');
+            Append(sb, "model", request.Model);
+            sb.Append(',');
+            Append(sb, "resumedFrom", request.ResumeSessionId);
+            sb.Append(',');
             Append(sb, "startedAtUtc", startedAtUtc.ToString("o", CultureInfo.InvariantCulture));
             sb.Append(',');
             sb.Append("\"processId\":").Append(processId.ToString(CultureInfo.InvariantCulture));
@@ -365,6 +369,8 @@ namespace OxenteGames.JiraCommunication.Agents
                     info.Provider = AgentJson.String(node, "provider") ?? AgentProvider.ClaudeCode;
                     info.Title = AgentJson.String(node, "title") ?? string.Empty;
                     info.IssueKey = AgentJson.String(node, "issueKey") ?? string.Empty;
+                    info.Model = AgentJson.String(node, "model") ?? string.Empty;
+                    info.ResumedFrom = AgentJson.String(node, "resumedFrom") ?? string.Empty;
                     info.ProcessId = (int)AgentJson.Number(node, "processId");
 
                     string started = AgentJson.String(node, "startedAtUtc");

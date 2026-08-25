@@ -6,7 +6,9 @@
 - Execução **headless em background**, com transcrição ao vivo (texto, ferramentas usadas, erros), resultado final, duração e custo reportados pela CLI.
 - A execução **sobrevive a recompilação de scripts, entrar em Play Mode e fechar o Unity**: cada execução é um diretório em `Library/JiraAgent/<runId>` e o Editor apenas lê o stream; não há pipe para perder.
 - **Histórico de execuções** com replay da transcrição, cancelamento (mata a árvore de processos), abrir a pasta da execução e copiar o resultado.
-- **Doctor da CLI**: detecta `claude`/`codex` no PATH e nos caminhos de instalação conhecidos, com override manual de caminho e instruções de instalação quando não encontrada.
+- **Doctor da CLI**: detecta `claude`/`codex` no PATH, nos caminhos de instalação conhecidos e **no bundle do app desktop do Claude** (`%APPDATA%\Claude\claude-code\<versão>`, versão mais nova primeiro) — quem só tem o app não precisa instalar nada. Override manual de caminho e instruções de instalação quando nada é encontrado.
+- **Continuar execução**: retoma a sessão anterior (`--resume`) enviando só o próximo passo, em vez de pagar o contexto inicial de novo. Ativo quando a execução terminou e reportou um id de sessão; oculto para Codex, que não tem retomada em `codex exec`.
+- **Seletor de modelo** por provedor, com **“Padrão da CLI”** como default — nenhum `--model` é enviado a menos que você escolha, então a configuração da CLI não é sobrescrita por acidente. Uma execução continuada mantém o modelo da sessão original.
 - Botão **Enviar para o agente** no detalhe da atividade: leva chave, título, descrição e o nome do branch da convenção do time já preenchidos.
 - **Gerador de instruções do projeto** (`.claude/skills/jira-unity/SKILL.md` para Claude; bloco delimitado em `AGENTS.md` para Codex), com a convenção de branch/commit configurada e os cuidados de `.meta`, prefabs e cenas.
 - **Permissões explícitas** por execução: somente leitura (padrão), padrão da CLI, ou editar sem perguntar. `bypassPermissions` não é exposto.

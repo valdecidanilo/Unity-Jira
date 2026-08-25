@@ -87,6 +87,20 @@ namespace OxenteGames.JiraCommunication.Agents
             return sb.ToString();
         }
 
+        /// <summary>
+        /// A follow-up turn in a session that is being resumed.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately bare: the resumed session already holds the project framing,
+        /// the issue and everything the agent read. Repeating that here would pay for
+        /// the same context twice and is the whole reason to resume instead of
+        /// starting fresh.
+        /// </remarks>
+        public static string BuildFollowUp(string userInstruction)
+        {
+            return (userInstruction ?? string.Empty).Trim();
+        }
+
         /// <summary>A short label for the run list, derived from the task.</summary>
         public static string BuildTitle(string issueKey, string userInstruction)
         {
