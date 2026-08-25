@@ -26,6 +26,9 @@ namespace OxenteGames.JiraCommunication.UI
     {
         private readonly Action _repaint;
 
+        /// <summary>Rebuilds the whole panel, for changes that alter its per-provider fields.</summary>
+        private readonly Action _rebuild;
+
         private VisualElement _root;
 
         private Label _cliStatus;
@@ -64,12 +67,28 @@ namespace OxenteGames.JiraCommunication.UI
         private string _issueDescription = string.Empty;
         private string _issueBranch = string.Empty;
 
-        public AgentConsoleView(Action repaint)
+        public AgentConsoleView(Action repaint, Action rebuild)
         {
             _repaint = repaint;
+            _rebuild = rebuild;
         }
 
-        private static string Provider => AgentProvider.FromAiProvider(JiraPreferences.AiProvider);
+        /// <summary>Provider names for the dropdown, in <see cref="AgentProvider.All"/> order.</summary>
+        private static List<string> BuildProviderLabels()
+        {
+            var labels = new List<string>(AgentProvider.All.Length);
+
+            foreach (string provider in AgentProvider.All)
+                labels.Add(AgentProvider.DisplayName(provider));
+
+            return labels;
+        }
+
+        /// <summary>
+        /// The agent's own provider setting — deliberately not derived from the AI
+        /// assistant's provider, which belongs to the API-key feature.
+        /// </summary>
+        private static string Provider => JiraPreferences.AgentProviderId;
 
         private static bool IsPortuguese => L.Current != L.En;
 
@@ -162,6 +181,33 @@ namespace OxenteGames.JiraCommunication.UI
             var title = new Label(L.Tr(L.K.AgentCliTitle));
             JiraStyles.ApplySectionTitle(title);
             card.Add(title);
+
+            // States plainly that this feature is not the API-key path, because the two
+            // sit in the same window and are easy to conflate.
+            var authNote = new Label(L.Tr(L.K.AgentNoApiKeyNote));
+            JiraStyles.ApplyMuted(authNote);
+            card.Add(authNote);
+
+            var providerDropdown = new DropdownField(L.Tr(L.K.AgentProviderLabel))
+            {
+                choices = BuildProviderLabels()
+            };
+            providerDropdown.index = Math.Max(0, Array.IndexOf(AgentProvider.All, Provider));
+            JiraStyles.ApplyDropdown(providerDropdown);
+            providerDropdown.RegisterValueChangedCallback(_ =>
+            {
+                int index = providerDropdown.index;
+                if (index < 0 || index >= AgentProvider.All.Length)
+                    return;
+
+                JiraPreferences.AgentProviderId = AgentProvider.All[index];
+
+                // The CLI path field, model list and skill target are all per-provider,
+                // so rebuild rather than trying to patch each one in place.
+                AgentCliLocator.InvalidateCache();
+                _rebuild?.Invoke();
+            });
+            card.Add(providerDropdown);
 
             _cliStatus = new Label(L.Tr(L.K.AgentCliChecking));
             JiraStyles.ApplyMuted(_cliStatus);

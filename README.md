@@ -123,7 +123,10 @@ e roda comandos.
 
 ### Como usar
 
-1. Tenha a CLI do provedor escolhido em `Configurações → Assistente de IA`.
+1. Escolha o agente no dropdown **Agente** do card *CLI do agente* (Claude Code
+   ou Codex). Essa escolha é **independente** do Assistente de IA das
+   Configurações: aquele usa API Key e é cobrado por token, este usa a CLI com a
+   conta em que você já está logado e consome o seu plano.
 
    **Se você usa o app desktop do Claude, provavelmente não precisa instalar nada.**
    O app já traz um `claude` completo em
@@ -190,9 +193,18 @@ O padrão é **“Padrão da CLI”**, que não envia `--model` — o package n�
 a sua configuração sem você pedir. Uma execução continuada mantém o modelo da
 sessão original; trocar no meio descartaria o contexto que se quis reaproveitar.
 
-Vale notar que o package tem **dois caminhos de cobrança distintos**: o assistente
-de IA (`IAiIssueClient`) usa a sua API key e é medido por token; o agente usa a
-CLI, que pode estar na sua assinatura. Contas diferentes, mesma janela.
+### Dois caminhos de cobrança, um por recurso
+
+O package tem **duas integrações de IA que não se misturam**, e cada uma tem o seu
+próprio seletor de provedor:
+
+| Recurso | Onde escolhe | Credencial | Cobrança |
+| --- | --- | --- | --- |
+| Assistente de IA (preenche título/descrição) | `Configurações → Assistente de IA` | API Key sua | por token |
+| Agente local (trabalha no repositório) | aba `Agente → CLI do agente` | nenhuma; a CLI usa o seu login | o seu plano |
+
+Escolher ChatGPT no Assistente **não** faz o agente procurar o Codex — são
+configurações separadas, de propósito.
 
 ### Credenciais
 

@@ -717,6 +717,15 @@ namespace OxenteGames.JiraCommunication.Localization
                 "Write the next step in the Task field before continuing."
             },
             [K.AgentResumedFrom] = new[] { "continuação de {0}", "continued from {0}" },
+
+            [K.AgentProviderLabel] = new[] { "Agente", "Agent" },
+            [K.AgentNoApiKeyNote] = new[]
+            {
+                "Este recurso não usa API Key. A CLI entra com a conta em que você já está logado, "
+                + "consumindo o seu plano — é independente do Assistente de IA das Configurações, que é cobrado por token.",
+                "This feature uses no API Key. The CLI signs in with the account you are already logged into, "
+                + "consuming your plan — independent of the AI Assistant in Settings, which is billed per token."
+            },
         };
 
         internal static class K
@@ -1086,6 +1095,8 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string AgentContinueUnavailable = "AgentContinueUnavailable";
             public const string MsgAgentNoFollowUp = "MsgAgentNoFollowUp";
             public const string AgentResumedFrom = "AgentResumedFrom";
+            public const string AgentProviderLabel = "AgentProviderLabel";
+            public const string AgentNoApiKeyNote = "AgentNoApiKeyNote";
         }
     }
 }

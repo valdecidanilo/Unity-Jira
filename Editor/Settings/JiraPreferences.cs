@@ -21,6 +21,7 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AiTokenKey = BaseKey + "Ai.Token";
         private const string AiModelKey = BaseKey + "Ai.Model";
         private const string AiProviderKey = BaseKey + "Ai.Provider";
+        private const string AgentProviderKey = BaseKey + "Agent.Provider";
         private const string AgentCliPathKey = BaseKey + "Agent.CliPath";
         private const string AgentPermissionKey = BaseKey + "Agent.Permission";
         private const string AgentModelKey = BaseKey + "Agent.Model";
@@ -172,6 +173,18 @@ namespace OxenteGames.JiraCommunication.Settings
         // No credential is stored here: the agent CLI authenticates with the account
         // the developer already logged into, so unlike the HTTP drafting path above
         // there is no token for this feature to keep.
+
+        /// <summary>
+        /// Which agent CLI to drive. Stored separately from <see cref="AiProvider"/>:
+        /// the assistant is an API-key HTTP feature and the agent is a local CLI on the
+        /// developer's own plan, so one must not decide the other.
+        /// </summary>
+        public static string AgentProviderId
+        {
+            get => Agents.AgentProvider.Sanitize(
+                EditorPrefs.GetString(AgentProviderKey, Agents.AgentProvider.ClaudeCode));
+            set => EditorPrefs.SetString(AgentProviderKey, Agents.AgentProvider.Sanitize(value));
+        }
 
         /// <summary>
         /// Explicit path to a provider's CLI. Empty means auto-discovery, which is the

@@ -4,20 +4,31 @@ using System.Collections.Generic;
 namespace OxenteGames.JiraCommunication.Agents
 {
     /// <summary>Which local agent CLI backs a run.</summary>
+    /// <remarks>
+    /// This choice is stored independently of the AI assistant's provider on purpose.
+    /// The two features share nothing operationally: the assistant is an HTTP call
+    /// billed per token against an API key, while the agent is a local CLI that
+    /// authenticates with the developer's own login and consumes their plan. Deriving
+    /// one from the other meant a developer whose assistant was set to ChatGPT had
+    /// the agent tab silently hunting for the Codex CLI.
+    /// </remarks>
     internal static class AgentProvider
     {
         public const string ClaudeCode = "claude-code";
         public const string Codex = "codex";
 
-        /// <summary>Maps the AI provider stored in preferences to its agent CLI.</summary>
-        public static string FromAiProvider(string aiProvider)
-        {
-            return aiProvider == Settings.JiraPreferences.ProviderOpenAi ? Codex : ClaudeCode;
-        }
+        /// <summary>Selectable providers, in display order.</summary>
+        public static readonly string[] All = { ClaudeCode, Codex };
 
         public static string DisplayName(string provider)
         {
             return provider == Codex ? "Codex CLI" : "Claude Code";
+        }
+
+        /// <summary>Normalizes an unknown or empty stored value to the default.</summary>
+        public static string Sanitize(string provider)
+        {
+            return provider == Codex ? Codex : ClaudeCode;
         }
     }
 

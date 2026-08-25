@@ -6890,7 +6890,14 @@ namespace OxenteGames.JiraCommunication
 
         private VisualElement BuildAgentPanel()
         {
-            _agentConsole = new AgentConsoleView(Repaint);
+            // Repaint for live transcript updates; the rebuild callback is for changes
+            // that swap the panel's per-provider fields, matching how the settings tab
+            // rebuilds on a provider or language change.
+            _agentConsole = new AgentConsoleView(Repaint, () =>
+            {
+                _activeTab = Tab.Agent;
+                CreateGUI();
+            });
             return _agentConsole.Build();
         }
 

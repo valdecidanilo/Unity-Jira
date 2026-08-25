@@ -13,7 +13,11 @@
 - **Gerador de instruções do projeto** (`.claude/skills/jira-unity/SKILL.md` para Claude; bloco delimitado em `AGENTS.md` para Codex), com a convenção de branch/commit configurada e os cuidados de `.meta`, prefabs e cenas.
 - **Permissões explícitas** por execução: somente leitura (padrão), padrão da CLI, ou editar sem perguntar. `bypassPermissions` não é exposto.
 - Modo **Abrir no terminal** para uma sessão interativa (não rastreada).
-- Nenhuma credencial nova é armazenada: a CLI usa a conta em que o desenvolvedor já está logado.
+- **Seletor de agente próprio**, independente do provedor do Assistente de IA. Os dois recursos não compartilham nada:
+  o assistente é HTTP com API Key cobrada por token, o agente é CLI local no plano do desenvolvedor. Antes o provedor do
+  agente era derivado do provedor do assistente, então quem tinha ChatGPT selecionado via a aba Agente procurar a CLI do
+  Codex em vez da do Claude.
+- Nenhuma credencial nova é armazenada: a CLI usa a conta em que o desenvolvedor já está logado, e a aba diz isso explicitamente.
 
 ## 0.8.0 - 2026-07-28
 
