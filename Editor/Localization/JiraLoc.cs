@@ -718,6 +718,13 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.AgentResumedFrom] = new[] { "continuação de {0}", "continued from {0}" },
 
+            [K.BtnAgentDiagnostics] = new[] { "Copiar diagnóstico", "Copy diagnostics" },
+            [K.MsgAgentDiagnosticsCopied] = new[]
+            {
+                "Diagnóstico copiado e enviado ao Console.",
+                "Diagnostics copied and written to the Console."
+            },
+
             [K.AgentProviderLabel] = new[] { "Agente", "Agent" },
             [K.AgentNoApiKeyNote] = new[]
             {
@@ -1095,6 +1102,8 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string AgentContinueUnavailable = "AgentContinueUnavailable";
             public const string MsgAgentNoFollowUp = "MsgAgentNoFollowUp";
             public const string AgentResumedFrom = "AgentResumedFrom";
+            public const string BtnAgentDiagnostics = "BtnAgentDiagnostics";
+            public const string MsgAgentDiagnosticsCopied = "MsgAgentDiagnosticsCopied";
             public const string AgentProviderLabel = "AgentProviderLabel";
             public const string AgentNoApiKeyNote = "AgentNoApiKeyNote";
         }

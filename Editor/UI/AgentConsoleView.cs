@@ -258,6 +258,25 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyCompactButton(copyInstall, false);
             _cliActions.Add(copyInstall);
 
+            // Turns a bare "not found" into something reportable: the exact list of
+            // locations that were checked, and whether the host was detected as Windows.
+            var diagnostics = new Button(() =>
+            {
+                AgentCliInfo? probed = AgentCliLocator.Cached(Provider);
+                string report = probed.HasValue
+                    ? probed.Value.Diagnostics
+                    : L.Tr(L.K.AgentCliChecking);
+
+                EditorGUIUtility.systemCopyBuffer = report;
+                Debug.Log("[Jira] Agent CLI diagnostics\n\n" + report);
+                SetTaskStatus(L.Tr(L.K.MsgAgentDiagnosticsCopied), true);
+            })
+            {
+                text = L.Tr(L.K.BtnAgentDiagnostics)
+            };
+            JiraStyles.ApplyCompactButton(diagnostics, false);
+            _cliActions.Add(diagnostics);
+
             card.Add(_cliActions);
             return card;
         }

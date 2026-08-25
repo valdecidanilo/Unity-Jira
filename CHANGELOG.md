@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1 - 2026-08-25
+
+- **Detecção de plataforma em runtime** no lugar do define `UNITY_EDITOR_WIN`. Toda decisão de shell, caminho e lançador do agente dependia desse define; se ele faltasse numa compilação, tudo caía no ramo Unix (shell `/bin/sh`, busca em `/usr/local/bin`) e uma máquina com a CLI perfeitamente instalada reportava "não encontrado". A checagem em runtime não falha assim, e não usa API do Unity — o inicializador pode rodar em thread de background.
+- **Instalação via Microsoft Store (MSIX) reconhecida**: além de `%APPDATA%\Claude`, o locator procura em `%LOCALAPPDATA%\Packages\Claude*\LocalCache\Roaming\Claude\claude-code`. O nome da família do pacote é casado por wildcard porque carrega um hash de publicador que não deve ser fixado no código. Assim a forma de instalação da máquina não decide se o recurso funciona.
+- **Botão “Copiar diagnóstico”** no card da CLI: lista todos os caminhos verificados (com hit/miss, em ordem) e se o host foi detectado como Windows. Um "não encontrado" passa a ser diagnosticável de dentro do Editor, em vez de exigir reproduzir o probe à mão fora do Unity.
+
 ## 0.9.0 - 2026-08-25
 
 - Nova aba **Agente**: descreva a tarefa e um agente local (**Claude Code** ou **Codex CLI**) trabalha no repositório do projeto, sem sair do Unity.

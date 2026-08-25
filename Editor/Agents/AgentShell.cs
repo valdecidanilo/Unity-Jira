@@ -48,14 +48,23 @@ namespace OxenteGames.JiraCommunication.Agents
     /// </remarks>
     internal static class AgentShell
     {
-        // Deliberately not const: a const would let the compiler fold every
-        // platform branch and report the other one as unreachable, filling the
-        // Editor console with CS0162 warnings from this package.
-#if UNITY_EDITOR_WIN
-        public static readonly bool IsWindows = true;
-#else
-        public static readonly bool IsWindows = false;
-#endif
+        /// <summary>True when the Editor is running on Windows.</summary>
+        /// <remarks>
+        /// Detected at runtime rather than from a <c>UNITY_EDITOR_WIN</c> define. Every
+        /// path, shell and launcher decision in the agent layer branches on this, so if
+        /// the define were ever absent from a compilation the whole feature would
+        /// silently take the Unix branch: the shell would be <c>/bin/sh</c>, discovery
+        /// would look under <c>/usr/local/bin</c>, and a machine with a perfectly good
+        /// CLI would report "not found". A runtime check cannot fail that way.
+        /// <para>
+        /// No Unity API is used here on purpose — this initializer can first run on a
+        /// background thread (from <see cref="RunAsync"/>), where touching
+        /// <c>UnityEngine.Application</c> would throw.
+        /// </para>
+        /// </remarks>
+        public static readonly bool IsWindows =
+            Path.DirectorySeparatorChar == '\\' ||
+            Environment.OSVersion.Platform == PlatformID.Win32NT;
 
         public static string ShellExecutable => IsWindows ? "cmd.exe" : "/bin/sh";
 
