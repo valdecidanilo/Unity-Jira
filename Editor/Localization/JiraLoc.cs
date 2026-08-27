@@ -1061,6 +1061,12 @@ namespace OxenteGames.JiraCommunication.Localization
                 "O valor em US$ é o que a CLI reporta como equivalente daqueles tokens no preço da API — referência, não fatura. Logado no seu plano, ele consome a cota e não gera cobrança extra; com uma API Key no ambiente, aí sim seria cobrado, e é isso que a opção acima evita.",
                 "The US$ figure is what the CLI reports as those tokens' equivalent at API prices — a reference, not an invoice. Signed into your plan it consumes quota and adds no charge; with an API key in the environment it would be billed, which is what the option above prevents."
             },
+
+            [K.MsgAgentEnvEmailMismatch] = new[]
+            {
+                "O e-mail aqui ({0}) não é o da conexão da janela ({1}). O token pertence a uma conta só: com o e-mail errado o Jira responde 401, que parece token inválido e não é.",
+                "The e-mail here ({0}) is not the one the window connected with ({1}). A token belongs to one account: with the wrong e-mail Jira answers 401, which looks like an invalid token and is not."
+            },
         };
 
         internal static class K
@@ -1497,6 +1503,7 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAgentEnvTestOk = "MsgAgentEnvTestOk";
             public const string MsgAgentEnvTestFailed = "MsgAgentEnvTestFailed";
             public const string MsgAgentEnvApiKeyWarning = "MsgAgentEnvApiKeyWarning";
+            public const string MsgAgentEnvEmailMismatch = "MsgAgentEnvEmailMismatch";
             public const string AgentPlanOnlyLabel = "AgentPlanOnlyLabel";
             public const string AgentPlanOnlyHint = "AgentPlanOnlyHint";
             public const string AgentCostMeaningNote = "AgentCostMeaningNote";

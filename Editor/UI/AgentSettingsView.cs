@@ -622,6 +622,22 @@ namespace OxenteGames.JiraCommunication.UI
             _envJiraStatus.text = L.Tr(connected ? L.K.MsgAgentEnvJiraOk : L.K.MsgAgentEnvJiraMissing);
             JiraStyles.ApplyInlineStatus(_envJiraStatus, connected);
 
+            // A token belongs to the account that created it, so an e-mail here that
+            // is not the one the window connected with produces a 401 that looks like
+            // a bad token and is not one. Worth saying before the agent hits it.
+            if (connected)
+            {
+                string envEmail = ValueOf(AgentEnvFile.KeyEmail);
+                string windowEmail = JiraPreferences.Email;
+
+                if (!string.IsNullOrWhiteSpace(windowEmail) &&
+                    !string.Equals(envEmail, windowEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    _envJiraStatus.text = L.Tr(L.K.MsgAgentEnvEmailMismatch, envEmail, windowEmail);
+                    JiraStyles.ApplyInlineStatus(_envJiraStatus, false);
+                }
+            }
+
             // An API key set here survives the plan-only guard, which clears the
             // machine's copy but not one the developer wrote on purpose. Saying so is
             // the only way that stays a decision rather than a surprise on the invoice.
@@ -691,6 +707,18 @@ namespace OxenteGames.JiraCommunication.UI
 
             SetStatus(L.Tr(L.K.MsgAgentEnvTestFailed,
                 detail.Length == 0 ? "sem resposta / no response" : detail), false);
+        }
+
+        /// <summary>One variable's value from the editor buffer, or empty.</summary>
+        private string ValueOf(string key)
+        {
+            foreach (AgentEnvVariable variable in AgentEnvFile.Parse(_envEditor.value))
+            {
+                if (variable.Key == key)
+                    return variable.Value ?? string.Empty;
+            }
+
+            return string.Empty;
         }
 
         /// <summary>Pulls the display name out of the /myself payload, or empty.</summary>

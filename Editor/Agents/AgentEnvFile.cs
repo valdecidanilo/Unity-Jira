@@ -181,7 +181,7 @@ namespace OxenteGames.JiraCommunication.Agents
                 if (!string.IsNullOrEmpty(folder))
                     Directory.CreateDirectory(folder);
 
-                File.WriteAllText(path, content ?? string.Empty, new UTF8Encoding(false));
+                File.WriteAllText(path, Normalize(content), new UTF8Encoding(false));
 
                 // Written here as well as at import: the path is configurable, so a
                 // file that moved must be protected where it landed.
@@ -192,6 +192,21 @@ namespace OxenteGames.JiraCommunication.Agents
             {
                 return exception.Message;
             }
+        }
+
+        /// <summary>
+        /// Forces Unix line endings.
+        /// </summary>
+        /// <remarks>
+        /// Not cosmetic. The Jira skill's helper reads this file with the shell's
+        /// <c>.</c> command: a CRLF file assigns a value with a trailing carriage
+        /// return, that byte travels into the basic-auth header, and Jira answers 401.
+        /// The failure reads exactly like a wrong token, which is the worst possible
+        /// way for a line ending to present itself.
+        /// </remarks>
+        private static string Normalize(string content)
+        {
+            return (content ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
         /// <summary>
