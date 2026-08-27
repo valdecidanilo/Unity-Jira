@@ -846,13 +846,13 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.AgentEnvTitle] = new[]
             {
-                "Variáveis do agente (.env)",
-                "Agent environment (.env)"
+                "Credenciais do agente (jira.env)",
+                "Agent credentials (jira.env)"
             },
             [K.AgentEnvNote] = new[]
             {
-                "Criado automaticamente na raiz do projeto. As variáveis daqui são exportadas para a CLI antes de cada execução — é assim que o agente recebe a conexão com o Jira e as opções da CLI.",
-                "Created automatically at the project root. These variables are exported to the CLI before every run — this is how the agent gets the Jira connection and the CLI options."
+                "Arquivo único, em ~/.claude/jira.env — o mesmo que a skill do Jira lê. Criado automaticamente, guarda a conexão com o Jira e é exportado para a CLI antes de cada execução.",
+                "A single file at ~/.claude/jira.env — the one the Jira skill reads. Created automatically, it holds the Jira connection and is exported to the CLI before every run."
             },
             [K.AgentEnvEnabledLabel] = new[]
             {
@@ -866,13 +866,13 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.AgentEnvPathHint] = new[]
             {
-                "Vazio usa {0} na raiz do projeto. Caminho relativo parte da raiz; absoluto é usado como está.",
-                "Empty uses {0} at the project root. A relative path starts there; an absolute one is used as given."
+                "Vazio usa ~/.claude/{0}, compartilhado por todos os projetos desta máquina. Caminho relativo parte da pasta do projeto; absoluto é usado como está.",
+                "Empty uses ~/.claude/{0}, shared by every project on this machine. A relative path starts at the project folder; an absolute one is used as given."
             },
             [K.AgentEnvSecretsNote] = new[]
             {
-                "Uma variável por linha, CHAVE=valor, sem interpolação. O arquivo guarda o seu token do Jira: ele é adicionado ao .gitignore automaticamente e não deve ser commitado nem compartilhado.",
-                "One variable per line, KEY=value, no interpolation. The file holds your Jira token: it is added to .gitignore automatically and must not be committed or shared."
+                "Uma variável por linha, CHAVE=valor, sem interpolação. O arquivo guarda o seu token do Jira: por isso fica na sua pasta pessoal, fora do repositório, e não deve ser compartilhado.",
+                "One variable per line, KEY=value, no interpolation. The file holds your Jira token: that is why it lives in your home folder, outside the repository, and must not be shared."
             },
             [K.BtnAgentEnvSave] = new[]
             {
@@ -992,8 +992,8 @@ namespace OxenteGames.JiraCommunication.Localization
 
             [K.BtnAgentEnvCreate] = new[]
             {
-                "Criar arquivo .env",
-                "Create .env file"
+                "Criar arquivo jira.env",
+                "Create jira.env file"
             },
             [K.BtnAgentEnvFill] = new[]
             {

@@ -175,15 +175,27 @@ namespace OxenteGames.JiraCommunication.Skills
 
             sb.AppendLine("### Jira itself");
             sb.AppendLine();
-            sb.AppendLine("Your environment may carry `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN`, from");
-            sb.AppendLine("the project's `.env`. When all three are set you may query the Jira Cloud REST");
-            sb.AppendLine("API yourself for context you are missing — the issue, its comments, linked");
-            sb.AppendLine("issues — with basic auth:");
+            sb.AppendLine("Credentials live in `~/.claude/jira.env` — `JIRA_URL`, `JIRA_EMAIL`,");
+            sb.AppendLine("`JIRA_API_TOKEN` — the same file the `jira` skill reads. Runs started from the");
+            sb.AppendLine("Unity window also get them exported into the environment.");
+            sb.AppendLine();
+            sb.AppendLine("When you need Jira context the prompt does not carry — the issue, an epic by");
+            sb.AppendLine("name, comments, linked issues — fetch it yourself:");
+            sb.AppendLine();
+            sb.AppendLine("Use `curl` for it. A run started from Unity is headless and only that");
+            sb.AppendLine("command is pre-approved, so a helper script would be denied mid-task:");
             sb.AppendLine();
             sb.AppendLine("```sh");
             sb.AppendLine("curl -s -u \"$JIRA_EMAIL:$JIRA_API_TOKEN\" \\");
-            sb.AppendLine("  \"$JIRA_URL/rest/api/3/issue/KEY-123?fields=summary,description,status\"");
+            sb.AppendLine("  \"$JIRA_URL/rest/api/3/search?jql=summary~%22Fortune%20Locks%22\"");
             sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("In an interactive session the `jira` skill's helper is shorter:");
+            sb.AppendLine("`bash ~/.claude/skills/jira/jira.sh view KEY-123`, `... mine`, `... search`.");
+            sb.AppendLine();
+            sb.AppendLine("Finding an issue **by name** is a JQL search, not a `GET /issue/<name>` — that");
+            sb.AppendLine("endpoint only takes a key or id, and calling it with a title returns 404, which");
+            sb.AppendLine("reads like an authentication failure and is not one.");
             sb.AppendLine();
             sb.AppendLine("Rules for that access:");
             sb.AppendLine();
@@ -191,8 +203,8 @@ namespace OxenteGames.JiraCommunication.Skills
             sb.AppendLine("  task explicitly asks. The developer normally does those in the Jira Workspace");
             sb.AppendLine("  window, and an unrequested transition fights whatever they are doing there.");
             sb.AppendLine("- Never echo the token, and never write it into a file, a commit or your answer.");
-            sb.AppendLine("- When a variable is missing, say so instead of guessing a URL: the developer");
-            sb.AppendLine("  fills them in under Settings > Agent environment in the Unity window.");
+            sb.AppendLine("- If the file or a variable is missing, say so instead of guessing a URL: the");
+            sb.AppendLine("  developer fills it in under Settings > Agent credentials in the Unity window.");
             sb.AppendLine();
 
             sb.AppendLine("### Unity specifics");

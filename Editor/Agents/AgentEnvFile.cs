@@ -20,17 +20,22 @@ namespace OxenteGames.JiraCommunication.Agents
     /// </summary>
     /// <remarks>
     /// The agent runs as a detached shell script, so the only way to give it
-    /// configuration is the environment it starts with. Keeping that in a file at the
-    /// project root — rather than in <c>EditorPrefs</c> — is deliberate: a developer
-    /// debugging a run needs to see exactly what the process was given, and the agent
-    /// itself can read its own connection settings from there.
+    /// configuration is the environment it starts with. Keeping that in a file —
+    /// rather than in <c>EditorPrefs</c> — is deliberate: a developer debugging a run
+    /// needs to see exactly what the process was given, and the agent itself can read
+    /// its own connection settings from there.
+    /// <para>
+    /// The location is <c>~/.claude/jira.env</c>, and that is not our invention: it is
+    /// where the Jira skill for Claude Code already looks. Writing a second file
+    /// somewhere else produced exactly the failure this was meant to prevent — the
+    /// window reporting a connection configured while the agent, reading the file it
+    /// knows about, reported no credentials. One location, whoever wrote it.
+    /// </para>
     /// <para>
     /// The file carries <c>JIRA_URL</c>, <c>JIRA_EMAIL</c> and <c>JIRA_API_TOKEN</c>,
-    /// which is what lets the agent reach Jira on its own instead of every read going
-    /// through the window. That makes the file a credential store: it is created with
-    /// empty values, the Editor adds it to <c>.gitignore</c> on sight, and the header
-    /// says so — a token committed to a shared repository is the failure mode this
-    /// file invites, and the only real defence is that it never gets committed.
+    /// so it is a credential store: it is created with empty values, it lives in the
+    /// developer's home rather than in the repository — which is also what keeps it
+    /// out of a commit — and the header says as much.
     /// </para>
     /// <para>
     /// Parsing is intentionally lenient and dumb. This is not a dotenv
@@ -42,12 +47,47 @@ namespace OxenteGames.JiraCommunication.Agents
     /// </remarks>
     internal static class AgentEnvFile
     {
-        public const string DefaultFileName = ".env";
+        /// <summary>
+        /// Name of the shared credentials file, as the Jira skill's helper expects it.
+        /// </summary>
+        public const string DefaultFileName = "jira.env";
+
+        /// <summary>Where earlier versions of this package put the file.</summary>
+        private const string LegacyFileName = ".env";
+
+        /// <summary>Marks a file this package generated, for the legacy cleanup.</summary>
+        private const string GeneratedMarker = "# jira-unity:generated";
 
         /// <summary>Jira connection keys, in the order the template writes them.</summary>
         public const string KeyUrl = "JIRA_URL";
         public const string KeyEmail = "JIRA_EMAIL";
         public const string KeyToken = "JIRA_API_TOKEN";
+
+        /// <summary>
+        /// The Claude Code configuration folder in the developer's home.
+        /// </summary>
+        /// <remarks>
+        /// Resolved from the user profile rather than from <c>HOME</c>, which is often
+        /// unset for a Windows Editor launched from Explorer — the same reason the
+        /// CLI locator does not trust it either.
+        /// </remarks>
+        public static string ClaudeHome
+        {
+            get
+            {
+                try
+                {
+                    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    return string.IsNullOrWhiteSpace(home)
+                        ? string.Empty
+                        : Path.Combine(home, ".claude");
+                }
+                catch (Exception)
+                {
+                    return string.Empty;
+                }
+            }
+        }
 
         /// <summary>The Unity project folder — the parent of <c>Assets</c>.</summary>
         public static string ProjectRoot
@@ -70,22 +110,33 @@ namespace OxenteGames.JiraCommunication.Agents
         /// Absolute path of the env file.
         /// </summary>
         /// <remarks>
-        /// Anchored to the project root rather than to a run's working directory: the
-        /// file must resolve to the same place whether it is being edited in the
-        /// settings tab or exported into a run whose repository root sits elsewhere.
-        /// A configured path wins, so a team that keeps agent variables somewhere else
-        /// is not forced to move them; a relative override resolves from the project.
+        /// Defaults to <c>~/.claude/jira.env</c> — one file per developer, shared with
+        /// the Jira skill, and never inside a repository. A configured path still
+        /// wins, for a team that keeps agent variables somewhere else; a relative
+        /// override resolves from the project folder, which is the only reading of a
+        /// relative path that means anything to someone typing it here.
         /// </remarks>
         public static string Resolve()
         {
             string configured = JiraPreferences.AgentEnvPath;
 
-            if (string.IsNullOrWhiteSpace(configured))
-                return Path.Combine(ProjectRoot, DefaultFileName);
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return Path.IsPathRooted(configured)
+                    ? configured
+                    : Path.Combine(ProjectRoot, configured);
+            }
 
-            return Path.IsPathRooted(configured)
-                ? configured
-                : Path.Combine(ProjectRoot, configured);
+            string home = ClaudeHome;
+            return string.IsNullOrWhiteSpace(home)
+                ? Path.Combine(ProjectRoot, DefaultFileName)
+                : Path.Combine(home, DefaultFileName);
+        }
+
+        /// <summary>The file an earlier version of this package created, if it is still there.</summary>
+        public static string LegacyPath()
+        {
+            return Path.Combine(ProjectRoot, LegacyFileName);
         }
 
         public static bool Exists()
@@ -369,12 +420,95 @@ namespace OxenteGames.JiraCommunication.Agents
             }
         }
 
+        /// <summary>
+        /// Deals with the <c>.env</c> an earlier version wrote into the project.
+        /// </summary>
+        /// <remarks>
+        /// Values there are carried over to the shared file — losing a token the
+        /// developer already typed would be the worst possible way to change a default
+        /// path — and only then is the file removed, and only if this package wrote it
+        /// and nothing else was added to it. A <c>.env</c> that belongs to the game,
+        /// or one the developer edited beyond our keys, is left exactly where it is.
+        /// </remarks>
+        /// <returns>True when the legacy file was removed.</returns>
+        public static bool RetireLegacyFile()
+        {
+            try
+            {
+                string legacy = LegacyPath();
+                string current = Resolve();
+
+                if (!File.Exists(legacy) ||
+                    string.Equals(legacy, current, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                string legacyText = File.ReadAllText(legacy);
+                if (legacyText.IndexOf(GeneratedMarker, StringComparison.Ordinal) < 0 &&
+                    legacyText.IndexOf("Variáveis exportadas para a CLI do agente",
+                        StringComparison.Ordinal) < 0)
+                {
+                    // Not ours. Leave it alone.
+                    return false;
+                }
+
+                string merged = Read();
+                bool carried = false;
+
+                foreach (AgentEnvVariable variable in Parse(legacyText))
+                {
+                    if (string.IsNullOrWhiteSpace(variable.Value))
+                        continue;
+
+                    // Only fills gaps: the shared file is the one in use, so a value
+                    // already there is the newer of the two.
+                    if (!HasValue(merged, variable.Key))
+                    {
+                        merged = Upsert(merged, variable.Key, variable.Value);
+                        carried = true;
+                    }
+                }
+
+                if (carried)
+                    Write(merged);
+
+                File.Delete(legacy);
+
+                string meta = legacy + ".meta";
+                if (File.Exists(meta))
+                    File.Delete(meta);
+
+                return true;
+            }
+            catch (Exception)
+            {
+                // The old file lingering is untidy, not broken: the shared one is what
+                // both the window and the agent read.
+                return false;
+            }
+        }
+
+        private static bool HasValue(string content, string key)
+        {
+            foreach (AgentEnvVariable variable in Parse(content))
+            {
+                if (variable.Key == key && !string.IsNullOrWhiteSpace(variable.Value))
+                    return true;
+            }
+
+            return false;
+        }
+
         /// <summary>Starting content for a project that has no env file yet.</summary>
         public static string Template()
         {
             var sb = new StringBuilder(1024);
-            sb.AppendLine("# Variáveis exportadas para a CLI do agente antes de cada execução.");
-            sb.AppendLine("# Environment exported to the agent CLI before every run.");
+            sb.AppendLine(GeneratedMarker);
+            sb.AppendLine("# Credenciais do Jira lidas pelo agente (skill jira) e exportadas");
+            sb.AppendLine("# para a CLI antes de cada execução iniciada pela janela do Unity.");
+            sb.AppendLine("# Jira credentials read by the agent (jira skill) and exported to the");
+            sb.AppendLine("# CLI before every run started from the Unity window.");
             sb.AppendLine("#");
             sb.AppendLine("# NÃO COMMITE ESTE ARQUIVO — ele guarda o seu token do Jira.");
             sb.AppendLine("# DO NOT COMMIT THIS FILE — it holds your Jira token.");
@@ -398,7 +532,8 @@ namespace OxenteGames.JiraCommunication.Agents
     }
 
     /// <summary>
-    /// Creates the env file the first time the package is loaded in a project.
+    /// Creates the env file the first time the package is loaded, and retires the
+    /// copy earlier versions left inside the project.
     /// </summary>
     /// <remarks>
     /// Import-time creation is the point: a settings card pointing at a file that
@@ -414,7 +549,10 @@ namespace OxenteGames.JiraCommunication.Agents
     [InitializeOnLoad]
     internal static class AgentEnvBootstrap
     {
-        private const string FlagKey = "OxenteGames.JiraCommunication.Agent.EnvBootstrapped.";
+        // Versioned: the location changed to ~/.claude/jira.env, and a project
+        // already flagged by the previous version would never run the migration
+        // that moves its values there.
+        private const string FlagKey = "OxenteGames.JiraCommunication.Agent.EnvBootstrapped.v2.";
 
         static AgentEnvBootstrap()
         {
@@ -437,10 +575,11 @@ namespace OxenteGames.JiraCommunication.Agents
 
                 EditorPrefs.SetBool(flag, true);
 
-                if (AgentEnvFile.EnsureCreated())
-                    AssetDatabase.Refresh();
-
+                AgentEnvFile.EnsureCreated();
                 AgentEnvFile.EnsureIgnored();
+
+                if (AgentEnvFile.RetireLegacyFile())
+                    AssetDatabase.Refresh();
             }
             catch (Exception)
             {

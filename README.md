@@ -222,41 +222,41 @@ tokens`, junto com a duração da janela. Com limite zero a aba mostra só os n�
 brutos, em vez de inventar um denominador. É uma estimativa do uso desta máquina
 neste projeto, não uma leitura da sua conta.
 
-### Variáveis do agente (`.env`)
+### Credenciais do agente (`~/.claude/jira.env`)
 
-Ao importar o package, um arquivo **`.env` é criado na raiz do projeto** com as
-chaves já escritas e vazias:
+As credenciais do Jira ficam em **um arquivo só**, na sua pasta pessoal:
 
 ```
-JIRA_URL=
-JIRA_EMAIL=
-JIRA_API_TOKEN=
+~/.claude/jira.env
+
+JIRA_URL=https://suaempresa.atlassian.net
+JIRA_EMAIL=voce@empresa.com
+JIRA_API_TOKEN=...
 ```
 
-São elas que permitem ao agente **consultar o Jira sozinho durante o chat** (ler a
-issue, comentários, issues ligadas) em vez de depender do que veio no prompt. Em
-`Configurações → Variáveis do agente` você lê, edita e salva o arquivo; o botão
-**Preencher com a conexão** copia URL, e-mail e token da aba Conexão, para você não
-digitar o token duas vezes. Nada é gravado sem você clicar em **Salvar .env**.
+Esse caminho não é invenção nossa: é onde a skill `jira` do Claude Code
+(`~/.claude/skills/jira/jira.sh`) já procura. A janela do Unity lê e escreve o
+mesmo arquivo, então não existe a situação de a janela dizer "conectado" enquanto
+o agente diz que não tem credencial.
+
+O package cria o arquivo na importação, com as chaves vazias. Em
+`Configurações → Credenciais do agente` você lê, edita e salva; **Preencher com a
+conexão** copia URL, e-mail e token da aba Conexão (nada é gravado sem você clicar
+em **Salvar**), e **Testar conexão** chama `/rest/api/3/myself` pelo mesmo shell
+que a execução usa.
 
 O arquivo também aceita opções da CLI (`ANTHROPIC_MODEL`, `MAX_THINKING_TOKENS`,
 `BASH_DEFAULT_TIMEOUT_MS`, …). Uma variável por linha, `CHAVE=valor`, sem
-interpolação — o valor vai literal. Variável vazia não é exportada, para o agente
-não achar que tem conexão quando não tem.
+interpolação. Variável vazia não é exportada, para o agente não achar que tem
+conexão quando não tem.
 
-A exportação acontece no próprio script lançador, não no lado do Editor: a
-execução é um processo destacado, e um environment montado aqui não chegaria até
-ele.
+Toda execução iniciada pela janela exporta essas variáveis no próprio script
+lançador — a execução é um processo destacado, e um environment montado no lado do
+Editor não chegaria até ele.
 
-> **Este arquivo guarda o seu token do Jira.** O package o adiciona ao
-> `.gitignore` do projeto ao criá-lo e repete o aviso no cabeçalho do arquivo, mas
-> a responsabilidade de não commitar nem compartilhar continua sendo sua. O caminho
-> é configurável se você preferir guardá-lo fora do repositório.
-
-As instruções geradas para o agente descrevem esse acesso: **ler** a API do Jira é
-livre; **escrever** (transição, comentário, edição) só quando a tarefa pedir, já
-que a janela do Unity é o caminho normal para isso; e o token nunca deve aparecer
-em resposta, arquivo ou commit.
+> Quem atualizou de uma versão anterior: o `.env` que ficava na raiz do projeto tem
+> os valores migrados para cá e é removido na primeira carga. Um `.env` que não foi
+> este package que escreveu não é tocado.
 
 ### O agente chamando o Jira, na prática
 
