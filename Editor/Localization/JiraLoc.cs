@@ -851,13 +851,13 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.AgentEnvNote] = new[]
             {
-                "Estas variáveis são exportadas para a CLI antes de cada execução. O arquivo fica no repositório, então o time inteiro usa a mesma configuração.",
-                "These variables are exported to the CLI before every run. The file lives in the repository, so the whole team shares the same configuration."
+                "Criado automaticamente na raiz do projeto. As variáveis daqui são exportadas para a CLI antes de cada execução — é assim que o agente recebe a conexão com o Jira e as opções da CLI.",
+                "Created automatically at the project root. These variables are exported to the CLI before every run — this is how the agent gets the Jira connection and the CLI options."
             },
             [K.AgentEnvEnabledLabel] = new[]
             {
-                "Exportar o .env nas execuções",
-                "Export the .env on every run"
+                "Exportar estas variáveis nas execuções",
+                "Export these variables on every run"
             },
             [K.AgentEnvPathLabel] = new[]
             {
@@ -866,13 +866,13 @@ namespace OxenteGames.JiraCommunication.Localization
             },
             [K.AgentEnvPathHint] = new[]
             {
-                "Vazio usa {0} na raiz do repositório. Caminho relativo parte da raiz; absoluto é usado como está.",
-                "Empty uses {0} at the repository root. A relative path starts there; an absolute one is used as given."
+                "Vazio usa {0} na raiz do projeto. Caminho relativo parte da raiz; absoluto é usado como está.",
+                "Empty uses {0} at the project root. A relative path starts there; an absolute one is used as given."
             },
             [K.AgentEnvSecretsNote] = new[]
             {
-                "Uma variável por linha, no formato CHAVE=valor. Sem interpolação: o valor vai literal para o processo. Lembre que o arquivo fica no repositório — não coloque segredo que não possa ser commitado.",
-                "One variable per line, KEY=value. No interpolation: the value reaches the process literally. The file lives in the repository — do not put a secret there that cannot be committed."
+                "Uma variável por linha, CHAVE=valor, sem interpolação. O arquivo guarda o seu token do Jira: ele é adicionado ao .gitignore automaticamente e não deve ser commitado nem compartilhado.",
+                "One variable per line, KEY=value, no interpolation. The file holds your Jira token: it is added to .gitignore automatically and must not be committed or shared."
             },
             [K.BtnAgentEnvSave] = new[]
             {
@@ -988,6 +988,37 @@ namespace OxenteGames.JiraCommunication.Localization
             {
                 "Os números vêm do que a própria CLI reporta ao fim de cada execução, contando cache. É uma estimativa local do uso deste projeto, não uma leitura da sua conta.",
                 "The numbers come from what the CLI itself reports at the end of each run, cache included. It is a local estimate of this project's usage, not a reading of your account."
+            },
+
+            [K.BtnAgentEnvCreate] = new[]
+            {
+                "Criar arquivo .env",
+                "Create .env file"
+            },
+            [K.BtnAgentEnvFill] = new[]
+            {
+                "Preencher com a conexão",
+                "Fill from connection"
+            },
+            [K.MsgAgentEnvFilled] = new[]
+            {
+                "Conexão copiada para o editor. Revise e clique em Salvar .env.",
+                "Connection copied into the editor. Review it and click Save .env."
+            },
+            [K.MsgAgentEnvNoConnection] = new[]
+            {
+                "Conecte-se ao Jira na aba Conexão primeiro.",
+                "Connect to Jira in the Connection tab first."
+            },
+            [K.MsgAgentEnvJiraOk] = new[]
+            {
+                "JIRA_URL, JIRA_EMAIL e JIRA_API_TOKEN preenchidos: o agente consegue consultar o Jira.",
+                "JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN are set: the agent can query Jira."
+            },
+            [K.MsgAgentEnvJiraMissing] = new[]
+            {
+                "Faltam JIRA_URL / JIRA_EMAIL / JIRA_API_TOKEN — sem eles o agente não consulta o Jira sozinho.",
+                "JIRA_URL / JIRA_EMAIL / JIRA_API_TOKEN are missing — without them the agent cannot query Jira on its own."
             },
         };
 
@@ -1414,6 +1445,12 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAgentUsageIdle = "MsgAgentUsageIdle";
             public const string MsgAgentUsageWindow = "MsgAgentUsageWindow";
             public const string AgentUsageEstimateNote = "AgentUsageEstimateNote";
+            public const string BtnAgentEnvCreate = "BtnAgentEnvCreate";
+            public const string BtnAgentEnvFill = "BtnAgentEnvFill";
+            public const string MsgAgentEnvFilled = "MsgAgentEnvFilled";
+            public const string MsgAgentEnvNoConnection = "MsgAgentEnvNoConnection";
+            public const string MsgAgentEnvJiraOk = "MsgAgentEnvJiraOk";
+            public const string MsgAgentEnvJiraMissing = "MsgAgentEnvJiraMissing";
         }
     }
 }

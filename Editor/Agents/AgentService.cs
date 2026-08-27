@@ -232,7 +232,7 @@ namespace OxenteGames.JiraCommunication.Agents
                 string commandLine = runner.BuildCommandLine(request);
                 AgentRunStore.WriteScript(paths,
                     AgentScript.Build(paths, request.WorkingDirectory, commandLine,
-                        AgentEnvFile.Load(request.WorkingDirectory)));
+                        AgentEnvFile.Load()));
             }
             catch (Exception exception)
             {

@@ -38,6 +38,8 @@ namespace OxenteGames.JiraCommunication.UI
 
         private Label _envResolved;
         private Label _envSummary;
+        private Label _envJiraStatus;
+        private VisualElement _envCreateRow;
         private TextField _envEditor;
 
         private Label _usageSummary;
@@ -79,15 +81,18 @@ namespace OxenteGames.JiraCommunication.UI
         }
 
         /// <summary>
-        /// Resolves the repository the agent works in, then fills the fields that
-        /// depend on it: the skill path, and the env file's location and contents.
+        /// Resolves the repository the agent works in, then fills the field that
+        /// depends on it: where the project instructions are written.
         /// </summary>
+        /// <remarks>
+        /// The env file is not among them — it is anchored to the project root, not to
+        /// the run's working directory, so its card is complete the moment it is built.
+        /// </remarks>
         private async Task ResolveWorkingDirectoryAsync()
         {
             _workingDirectory = await AgentService.ResolveWorkingDirectoryAsync();
 
             RefreshSkillStatus();
-            RefreshEnv(true);
             RefreshUsageSummary();
             _repaint?.Invoke();
         }
@@ -412,45 +417,33 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyMuted(note);
             card.Add(note);
 
-            var enabled = new Toggle(L.Tr(L.K.AgentEnvEnabledLabel))
-            {
-                value = JiraPreferences.AgentEnvEnabled
-            };
-            enabled.style.marginBottom = 8;
-            enabled.RegisterValueChangedCallback(evt =>
-            {
-                JiraPreferences.AgentEnvEnabled = evt.newValue;
-                RefreshEnvSummary();
-            });
-            card.Add(enabled);
-
-            var pathField = new TextField(L.Tr(L.K.AgentEnvPathLabel))
-            {
-                value = JiraPreferences.AgentEnvPath
-            };
-            JiraStyles.ApplyField(pathField);
-            pathField.RegisterCallback<FocusOutEvent>(_ =>
-            {
-                JiraPreferences.AgentEnvPath = pathField.value;
-
-                // A different file means different contents; reload rather than leave
-                // the editor showing the previous file's text.
-                RefreshEnv(true);
-            });
-            card.Add(pathField);
-
-            var pathHint = new Label(L.Tr(L.K.AgentEnvPathHint, AgentEnvFile.DefaultFileName));
-            JiraStyles.ApplyFieldHint(pathHint);
-            card.Add(pathHint);
-
+            // The path comes first and always shows where the file actually is. The
+            // previous layout led with an empty override field, which read as "there
+            // is nothing configured here" even though the file existed.
             _envResolved = new Label();
-            JiraStyles.ApplyFieldHint(_envResolved);
+            JiraStyles.ApplyDynamicFieldLabel(_envResolved);
             card.Add(_envResolved);
+
+            _envJiraStatus = new Label();
+            JiraStyles.ApplyFieldHint(_envJiraStatus);
+            card.Add(_envJiraStatus);
+
+            _envCreateRow = new VisualElement();
+            JiraStyles.ApplyButtonRow(_envCreateRow);
+            _envCreateRow.style.marginTop = 0;
+
+            var create = new Button(CreateEnv) { text = L.Tr(L.K.BtnAgentEnvCreate) };
+            JiraStyles.ApplyPrimaryButton(create);
+            create.style.height = 26;
+            _envCreateRow.Add(create);
+
+            card.Add(_envCreateRow);
 
             _envEditor = new TextField { multiline = true };
             JiraStyles.ApplyField(_envEditor);
             JiraStyles.ApplyMultiline(_envEditor);
-            _envEditor.style.minHeight = 130;
+            _envEditor.style.minHeight = 150;
+            _envEditor.RegisterValueChangedCallback(_ => RefreshEnvSummary());
             card.Add(_envEditor);
 
             _envSummary = new Label();
@@ -468,22 +461,15 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyCompactButton(reload, false);
             row.Add(reload);
 
-            var template = new Button(() =>
-            {
-                // Only offered as a starting point; it never overwrites on its own.
-                _envEditor.value = AgentEnvFile.Template();
-                RefreshEnvSummary();
-                SetStatus(L.Tr(L.K.MsgAgentEnvTemplate), true);
-            })
-            {
-                text = L.Tr(L.K.BtnAgentEnvTemplate)
-            };
-            JiraStyles.ApplyCompactButton(template, false);
-            row.Add(template);
+            // Saves retyping the token that the Connection tab already holds — and
+            // typing it twice is how the two copies end up disagreeing.
+            var fill = new Button(FillFromConnection) { text = L.Tr(L.K.BtnAgentEnvFill) };
+            JiraStyles.ApplyCompactButton(fill, false);
+            row.Add(fill);
 
             var reveal = new Button(() =>
             {
-                string path = AgentEnvFile.Resolve(_workingDirectory);
+                string path = AgentEnvFile.Resolve();
 
                 if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
                 {
@@ -501,36 +487,110 @@ namespace OxenteGames.JiraCommunication.UI
 
             card.Add(row);
 
+            var enabled = new Toggle(L.Tr(L.K.AgentEnvEnabledLabel))
+            {
+                value = JiraPreferences.AgentEnvEnabled
+            };
+            enabled.style.marginTop = 10;
+            enabled.RegisterValueChangedCallback(evt =>
+            {
+                JiraPreferences.AgentEnvEnabled = evt.newValue;
+                RefreshEnvSummary();
+            });
+            card.Add(enabled);
+
+            // The override is the rare case, so it sits at the bottom rather than
+            // being the first thing the card asks for.
+            var pathField = new TextField(L.Tr(L.K.AgentEnvPathLabel))
+            {
+                value = JiraPreferences.AgentEnvPath
+            };
+            JiraStyles.ApplyField(pathField);
+            pathField.style.marginTop = 8;
+            pathField.RegisterCallback<FocusOutEvent>(focusOut =>
+            {
+                JiraPreferences.AgentEnvPath = pathField.value;
+
+                // A different file means different contents; reload rather than leave
+                // the editor showing the previous file's text.
+                RefreshEnv(true);
+            });
+            card.Add(pathField);
+
+            var pathHint = new Label(L.Tr(L.K.AgentEnvPathHint, AgentEnvFile.DefaultFileName));
+            JiraStyles.ApplyFieldHint(pathHint);
+            card.Add(pathHint);
+
             var warning = new Label(L.Tr(L.K.AgentEnvSecretsNote));
             JiraStyles.ApplyNote(warning);
             card.Add(warning);
 
-            RefreshEnv(false);
+            RefreshEnv(true);
             return card;
+        }
+
+        /// <summary>Creates the file with the template, for a project that lost it.</summary>
+        private void CreateEnv()
+        {
+            if (!AgentEnvFile.EnsureCreated())
+            {
+                SetStatus(L.Tr(L.K.MsgAgentEnvFailed, AgentEnvFile.Resolve()), false);
+                return;
+            }
+
+            AssetDatabase.Refresh();
+            RefreshEnv(true);
+            SetStatus(L.Tr(L.K.MsgAgentEnvSaved, AgentEnvFile.Resolve()), true);
+        }
+
+        /// <summary>
+        /// Copies the window's Jira connection into the editor buffer.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately not written to disk here. Putting a personal API token in a
+        /// file is a decision, so the developer sees the values land in the editor and
+        /// presses save — or does not.
+        /// </remarks>
+        private void FillFromConnection()
+        {
+            if (string.IsNullOrWhiteSpace(JiraPreferences.BaseUrl) ||
+                string.IsNullOrWhiteSpace(JiraPreferences.Token))
+            {
+                SetStatus(L.Tr(L.K.MsgAgentEnvNoConnection), false);
+                return;
+            }
+
+            _envEditor.value = AgentEnvFile.FillFromConnection(_envEditor.value);
+            RefreshEnvSummary();
+            SetStatus(L.Tr(L.K.MsgAgentEnvFilled), true);
         }
 
         /// <summary>
         /// Reloads the env file into the editor.
         /// </summary>
         /// <param name="reloadContent">
-        /// False while building, when the field is already empty and the working
-        /// directory is not known yet; true whenever the file on disk is the truth we
-        /// want on screen, which discards unsaved edits by design.
+        /// True whenever the file on disk is the truth we want on screen, which
+        /// discards unsaved edits by design.
         /// </param>
         private void RefreshEnv(bool reloadContent)
         {
             if (_envEditor == null)
                 return;
 
-            string path = AgentEnvFile.Resolve(_workingDirectory);
-            bool exists = !string.IsNullOrWhiteSpace(path) && File.Exists(path);
+            string path = AgentEnvFile.Resolve();
+            bool exists = AgentEnvFile.Exists();
 
             _envResolved.text = string.IsNullOrWhiteSpace(path)
                 ? string.Empty
                 : L.Tr(exists ? L.K.MsgAgentEnvPath : L.K.MsgAgentEnvPathAbsent, path);
 
+            // Creating is only offered when there is nothing there; otherwise the
+            // button would be a way to lose the file's contents by accident.
+            _envCreateRow.style.display = exists ? DisplayStyle.None : DisplayStyle.Flex;
+            _envEditor.SetEnabled(exists);
+
             if (reloadContent)
-                _envEditor.value = AgentEnvFile.Read(_workingDirectory);
+                _envEditor.SetValueWithoutNotify(AgentEnvFile.Read());
 
             RefreshEnvSummary();
         }
@@ -546,12 +606,16 @@ namespace OxenteGames.JiraCommunication.UI
                 ? L.Tr(L.K.MsgAgentEnvVars, count.ToString(CultureInfo.InvariantCulture))
                 : L.Tr(L.K.MsgAgentEnvDisabled);
 
+            bool connected = AgentEnvFile.HasJiraConnection(_envEditor.value);
+            _envJiraStatus.text = L.Tr(connected ? L.K.MsgAgentEnvJiraOk : L.K.MsgAgentEnvJiraMissing);
+            JiraStyles.ApplyInlineStatus(_envJiraStatus, connected);
+
             _repaint?.Invoke();
         }
 
         private void SaveEnv()
         {
-            string error = AgentEnvFile.Write(_workingDirectory, _envEditor.value);
+            string error = AgentEnvFile.Write(_envEditor.value);
 
             if (error != null)
             {
@@ -559,7 +623,8 @@ namespace OxenteGames.JiraCommunication.UI
                 return;
             }
 
-            SetStatus(L.Tr(L.K.MsgAgentEnvSaved, AgentEnvFile.Resolve(_workingDirectory)), true);
+            AssetDatabase.Refresh();
+            SetStatus(L.Tr(L.K.MsgAgentEnvSaved, AgentEnvFile.Resolve()), true);
             RefreshEnv(false);
         }
 

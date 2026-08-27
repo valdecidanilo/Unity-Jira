@@ -138,10 +138,24 @@ namespace OxenteGames.JiraCommunication.Skills
 
             sb.AppendLine("### Jira itself");
             sb.AppendLine();
-            sb.AppendLine("You have no Jira credentials and should not try to reach the Jira API.");
-            sb.AppendLine("Transitions, comments and attachments are done by the developer in the Jira");
-            sb.AppendLine("Workspace window, which holds the token. If your work implies a status change");
-            sb.AppendLine("or a comment, state that in your final answer and let the developer apply it.");
+            sb.AppendLine("Your environment may carry `JIRA_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN`, from");
+            sb.AppendLine("the project's `.env`. When all three are set you may query the Jira Cloud REST");
+            sb.AppendLine("API yourself for context you are missing — the issue, its comments, linked");
+            sb.AppendLine("issues — with basic auth:");
+            sb.AppendLine();
+            sb.AppendLine("```sh");
+            sb.AppendLine("curl -s -u \"$JIRA_EMAIL:$JIRA_API_TOKEN\" \\");
+            sb.AppendLine("  \"$JIRA_URL/rest/api/3/issue/KEY-123?fields=summary,description,status\"");
+            sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("Rules for that access:");
+            sb.AppendLine();
+            sb.AppendLine("- Reading is free. **Writing** — transitions, comments, edits — only when the");
+            sb.AppendLine("  task explicitly asks. The developer normally does those in the Jira Workspace");
+            sb.AppendLine("  window, and an unrequested transition fights whatever they are doing there.");
+            sb.AppendLine("- Never echo the token, and never write it into a file, a commit or your answer.");
+            sb.AppendLine("- When a variable is missing, say so instead of guessing a URL: the developer");
+            sb.AppendLine("  fills them in under Settings > Agent environment in the Unity window.");
             sb.AppendLine();
 
             sb.AppendLine("### Unity specifics");

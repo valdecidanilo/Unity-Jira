@@ -224,19 +224,39 @@ neste projeto, não uma leitura da sua conta.
 
 ### Variáveis do agente (`.env`)
 
-`Configurações → Variáveis do agente` edita, dentro da janela, um arquivo `.env`
-cujas variáveis são **exportadas para a CLI antes de cada execução** (por exemplo
-`ANTHROPIC_MODEL`, `MAX_THINKING_TOKENS`, `BASH_DEFAULT_TIMEOUT_MS`).
+Ao importar o package, um arquivo **`.env` é criado na raiz do projeto** com as
+chaves já escritas e vazias:
+
+```
+JIRA_URL=
+JIRA_EMAIL=
+JIRA_API_TOKEN=
+```
+
+São elas que permitem ao agente **consultar o Jira sozinho durante o chat** (ler a
+issue, comentários, issues ligadas) em vez de depender do que veio no prompt. Em
+`Configurações → Variáveis do agente` você lê, edita e salva o arquivo; o botão
+**Preencher com a conexão** copia URL, e-mail e token da aba Conexão, para você não
+digitar o token duas vezes. Nada é gravado sem você clicar em **Salvar .env**.
+
+O arquivo também aceita opções da CLI (`ANTHROPIC_MODEL`, `MAX_THINKING_TOKENS`,
+`BASH_DEFAULT_TIMEOUT_MS`, …). Uma variável por linha, `CHAVE=valor`, sem
+interpolação — o valor vai literal. Variável vazia não é exportada, para o agente
+não achar que tem conexão quando não tem.
 
 A exportação acontece no próprio script lançador, não no lado do Editor: a
 execução é um processo destacado, e um environment montado aqui não chegaria até
-ele. Uma variável por linha, `CHAVE=valor`, sem interpolação — o valor vai
-literal.
+ele.
 
-O padrão é `.env` na raiz do repositório, e o caminho é configurável (relativo
-parte da raiz; absoluto é usado como está). Como o arquivo mora no repositório,
-ele serve para configuração que o time compartilha — **não** para segredo que não
-possa ser commitado.
+> **Este arquivo guarda o seu token do Jira.** O package o adiciona ao
+> `.gitignore` do projeto ao criá-lo e repete o aviso no cabeçalho do arquivo, mas
+> a responsabilidade de não commitar nem compartilhar continua sendo sua. O caminho
+> é configurável se você preferir guardá-lo fora do repositório.
+
+As instruções geradas para o agente descrevem esse acesso: **ler** a API do Jira é
+livre; **escrever** (transição, comentário, edição) só quando a tarefa pedir, já
+que a janela do Unity é o caminho normal para isso; e o token nunca deve aparecer
+em resposta, arquivo ou commit.
 
 ### Dois caminhos de cobrança, um por recurso
 
@@ -253,10 +273,11 @@ configurações separadas, de propósito.
 
 ### Credenciais
 
-Este caminho **não guarda nenhum token**. A CLI usa a conta em que o
-desenvolvedor já está logado, e as instruções geradas dizem ao agente para não
-tentar falar com a API do Jira — transições e comentários continuam sendo feitos
-nesta janela, que já tem o token.
+A CLI do agente **não usa credencial nossa**: ela entra com a conta em que o
+desenvolvedor já está logado. O token do Jira só existe em dois lugares, os dois
+sob controle do desenvolvedor: o `EditorPrefs` desta máquina (aba Conexão) e o
+`.env` do projeto, se você optar por preenchê-lo para que o agente consulte o Jira.
+Transições e comentários continuam sendo feitos nesta janela por padrão.
 
 ## Segurança
 
