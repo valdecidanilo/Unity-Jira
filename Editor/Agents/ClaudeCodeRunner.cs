@@ -36,6 +36,11 @@ namespace OxenteGames.JiraCommunication.Agents
             if (!string.IsNullOrWhiteSpace(request.ResumeSessionId))
                 sb.Append(" --resume ").Append(AgentScript.Quote(request.ResumeSessionId));
 
+            // Last on the line, deliberately: the flag is variadic and would swallow
+            // any bare word that followed it.
+            if (!string.IsNullOrWhiteSpace(request.AllowedTools))
+                sb.Append(" --allowedTools \"").Append(request.AllowedTools).Append('"');
+
             return sb.ToString();
         }
 

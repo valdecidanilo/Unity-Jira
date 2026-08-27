@@ -58,7 +58,7 @@ namespace OxenteGames.JiraCommunication.Agents
     internal static class AgentScript
     {
         public static string Build(AgentRunPaths paths, string workingDirectory, string commandLine,
-            IList<AgentEnvVariable> environment = null)
+            IList<AgentEnvVariable> environment = null, bool planOnly = false)
         {
             var sb = new StringBuilder(512);
 
@@ -68,6 +68,7 @@ namespace OxenteGames.JiraCommunication.Agents
                 // Keep the CLI's UTF-8 output intact through the console layer.
                 sb.AppendLine("chcp 65001 > nul");
                 sb.AppendLine("cd /d \"" + workingDirectory + "\"");
+                AppendBillingGuard(sb, planOnly);
                 AppendEnvironment(sb, environment);
 
                 // "call" is mandatory, not stylistic. An npm global install of these
@@ -89,6 +90,7 @@ namespace OxenteGames.JiraCommunication.Agents
             {
                 sb.AppendLine("#!/bin/sh");
                 sb.AppendLine("cd \"" + workingDirectory + "\" || exit 1");
+                AppendBillingGuard(sb, planOnly);
                 AppendEnvironment(sb, environment);
                 sb.AppendLine(commandLine
                               + " < \"" + paths.Prompt + "\""
@@ -98,6 +100,42 @@ namespace OxenteGames.JiraCommunication.Agents
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Variables that move a run off the developer's plan and onto billed
+        /// credentials, cleared before the CLI starts.
+        /// </summary>
+        /// <remarks>
+        /// Cleared in the script rather than trusted to be absent. The run inherits
+        /// the Editor's environment, the Editor inherits the shell that launched it,
+        /// and an <c>ANTHROPIC_API_KEY</c> exported months ago in a profile is enough
+        /// to turn every background run into a metered API call without a single
+        /// visible sign in the window.
+        /// </remarks>
+        private static readonly string[] BilledCredentialVariables =
+        {
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "ANTHROPIC_BEDROCK_BASE_URL",
+            "ANTHROPIC_VERTEX_BASE_URL",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_CODE_USE_VERTEX"
+        };
+
+        private static void AppendBillingGuard(StringBuilder sb, bool planOnly)
+        {
+            if (!planOnly)
+                return;
+
+            foreach (string variable in BilledCredentialVariables)
+            {
+                // An empty assignment is how cmd removes a variable; sh needs unset.
+                sb.AppendLine(AgentShell.IsWindows
+                    ? "set \"" + variable + "=\""
+                    : "unset " + variable);
+            }
         }
 
         /// <summary>

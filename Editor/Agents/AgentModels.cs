@@ -181,6 +181,21 @@ namespace OxenteGames.JiraCommunication.Agents
         public string ResumeSessionId = string.Empty;
 
         /// <summary>
+        /// Tool patterns pre-approved for this run, in the CLI's own syntax, or empty.
+        /// </summary>
+        /// <remarks>
+        /// Needed because a headless run cannot answer a permission prompt: whatever
+        /// is not allowed up front is denied, silently, mid-task.
+        /// </remarks>
+        public string AllowedTools = string.Empty;
+
+        /// <summary>
+        /// Strip the variables that would move this run off the developer's plan and
+        /// onto a billed API account. See <c>JiraPreferences.AgentPlanOnly</c>.
+        /// </summary>
+        public bool PlanOnly = true;
+
+        /// <summary>
         /// CLI model id, or empty to leave the CLI's own configuration alone.
         /// See <see cref="AgentModelCatalog"/>.
         /// </summary>

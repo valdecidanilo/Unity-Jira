@@ -39,6 +39,7 @@ namespace OxenteGames.JiraCommunication.UI
         private Label _envResolved;
         private Label _envSummary;
         private Label _envJiraStatus;
+        private Label _envApiKeyWarning;
         private VisualElement _envCreateRow;
         private TextField _envEditor;
 
@@ -467,6 +468,12 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyCompactButton(fill, false);
             row.Add(fill);
 
+            // Answers "is the authentication working?" with the actual HTTP result
+            // instead of leaving it to be inferred from what the agent said.
+            var test = new Button(() => _ = TestJiraAsync()) { text = L.Tr(L.K.BtnAgentEnvTest) };
+            JiraStyles.ApplyCompactButton(test, false);
+            row.Add(test);
+
             var reveal = new Button(() =>
             {
                 string path = AgentEnvFile.Resolve();
@@ -520,6 +527,11 @@ namespace OxenteGames.JiraCommunication.UI
             var pathHint = new Label(L.Tr(L.K.AgentEnvPathHint, AgentEnvFile.DefaultFileName));
             JiraStyles.ApplyFieldHint(pathHint);
             card.Add(pathHint);
+
+            _envApiKeyWarning = new Label();
+            _envApiKeyWarning.style.display = DisplayStyle.None;
+            JiraStyles.ApplyNote(_envApiKeyWarning);
+            card.Add(_envApiKeyWarning);
 
             var warning = new Label(L.Tr(L.K.AgentEnvSecretsNote));
             JiraStyles.ApplyNote(warning);
@@ -610,7 +622,82 @@ namespace OxenteGames.JiraCommunication.UI
             _envJiraStatus.text = L.Tr(connected ? L.K.MsgAgentEnvJiraOk : L.K.MsgAgentEnvJiraMissing);
             JiraStyles.ApplyInlineStatus(_envJiraStatus, connected);
 
+            // An API key set here survives the plan-only guard, which clears the
+            // machine's copy but not one the developer wrote on purpose. Saying so is
+            // the only way that stays a decision rather than a surprise on the invoice.
+            bool billed = false;
+            foreach (AgentEnvVariable variable in AgentEnvFile.Parse(_envEditor.value))
+            {
+                if (variable.Key == "ANTHROPIC_API_KEY" && !string.IsNullOrWhiteSpace(variable.Value))
+                    billed = true;
+            }
+
+            _envApiKeyWarning.style.display = billed ? DisplayStyle.Flex : DisplayStyle.None;
+            _envApiKeyWarning.text = L.Tr(L.K.MsgAgentEnvApiKeyWarning);
+
             _repaint?.Invoke();
+        }
+
+        /// <summary>
+        /// Calls Jira with the credentials in the editor, through the same shell a run
+        /// uses, and reports what came back.
+        /// </summary>
+        /// <remarks>
+        /// Uses <c>curl</c> rather than the window's own HTTP client on purpose. The
+        /// question this button answers is not "are these credentials valid" but "does
+        /// the command the agent runs work here" — a proxy, a missing curl or a
+        /// corporate TLS interception fails one and not the other.
+        /// </remarks>
+        private async Task TestJiraAsync()
+        {
+            string url = null, email = null, token = null;
+
+            foreach (AgentEnvVariable variable in AgentEnvFile.Parse(_envEditor.value))
+            {
+                if (variable.Key == AgentEnvFile.KeyUrl)
+                    url = variable.Value;
+                else if (variable.Key == AgentEnvFile.KeyEmail)
+                    email = variable.Value;
+                else if (variable.Key == AgentEnvFile.KeyToken)
+                    token = variable.Value;
+            }
+
+            if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(email) ||
+                string.IsNullOrWhiteSpace(token))
+            {
+                SetStatus(L.Tr(L.K.MsgAgentEnvJiraMissing), false);
+                return;
+            }
+
+            SetStatus(L.Tr(L.K.MsgAgentEnvTesting), true);
+
+            string command = "curl -s -u \"" + email + ":" + token + "\" "
+                             + "\"" + url.TrimEnd('/') + "/rest/api/3/myself\"";
+
+            ShellResult result = await AgentShell.RunAsync(command, AgentEnvFile.ProjectRoot, 25);
+            string body = (result.StdOut ?? string.Empty).Trim();
+
+            if (body.IndexOf("accountId", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                SetStatus(L.Tr(L.K.MsgAgentEnvTestOk, ExtractDisplayName(body)), true);
+                return;
+            }
+
+            // Anything else is the failure the developer needs to read: a 401 body, an
+            // HTML login page from a wrong URL, or curl's own error on stderr.
+            string detail = body.Length > 0 ? body : (result.StdErr ?? string.Empty).Trim();
+            if (detail.Length > 300)
+                detail = detail.Substring(0, 300) + " [...]";
+
+            SetStatus(L.Tr(L.K.MsgAgentEnvTestFailed,
+                detail.Length == 0 ? "sem resposta / no response" : detail), false);
+        }
+
+        /// <summary>Pulls the display name out of the /myself payload, or empty.</summary>
+        private static string ExtractDisplayName(string body)
+        {
+            string name = AgentJson.String(AgentJson.Parse(body), "displayName");
+            return string.IsNullOrWhiteSpace(name) ? "?" : name;
         }
 
         private void SaveEnv()
@@ -691,6 +778,21 @@ namespace OxenteGames.JiraCommunication.UI
             JiraStyles.ApplyFieldHint(_usageSummary);
             card.Add(_usageSummary);
 
+            // Sits with the token numbers because this is the switch that decides
+            // whether those numbers are an estimate or an invoice.
+            var planOnly = new Toggle(L.Tr(L.K.AgentPlanOnlyLabel))
+            {
+                value = JiraPreferences.AgentPlanOnly
+            };
+            planOnly.style.marginTop = 6;
+            planOnly.RegisterValueChangedCallback(evt => JiraPreferences.AgentPlanOnly = evt.newValue);
+            card.Add(planOnly);
+
+            var planOnlyHint = new Label(L.Tr(L.K.AgentPlanOnlyHint));
+            JiraStyles.ApplyFieldHint(planOnlyHint);
+            planOnlyHint.style.marginTop = 2;
+            card.Add(planOnlyHint);
+
             var row = new VisualElement();
             JiraStyles.ApplyButtonRow(row);
 
@@ -711,6 +813,10 @@ namespace OxenteGames.JiraCommunication.UI
             var estimateNote = new Label(L.Tr(L.K.AgentUsageEstimateNote));
             JiraStyles.ApplyNote(estimateNote);
             card.Add(estimateNote);
+
+            var costNote = new Label(L.Tr(L.K.AgentCostMeaningNote));
+            JiraStyles.ApplyNote(costNote);
+            card.Add(costNote);
 
             RefreshUsageSummary();
             return card;

@@ -680,7 +680,7 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.AgentEventStarted] = new[] { "sessão iniciada", "session started" },
             [K.AgentEventError] = new[] { "erro", "error" },
 
-            [K.AgentMetaCost] = new[] { "custo US$ {0}", "cost US$ {0}" },
+            [K.AgentMetaCost] = new[] { "≈ US$ {0}", "≈ US$ {0}" },
             [K.AgentMetaDuration] = new[] { "{0} s", "{0} s" },
             [K.MsgAgentNoTask] = new[] { "Descreva a tarefa antes de executar.", "Describe the task before running." },
             [K.MsgAgentStartFailed] = new[] { "Não foi possível iniciar: {0}", "Could not start: {0}" },
@@ -1019,6 +1019,47 @@ namespace OxenteGames.JiraCommunication.Localization
             {
                 "Faltam JIRA_URL / JIRA_EMAIL / JIRA_API_TOKEN — sem eles o agente não consulta o Jira sozinho.",
                 "JIRA_URL / JIRA_EMAIL / JIRA_API_TOKEN are missing — without them the agent cannot query Jira on its own."
+            },
+
+            [K.BtnAgentEnvTest] = new[]
+            {
+                "Testar conexão",
+                "Test connection"
+            },
+            [K.MsgAgentEnvTesting] = new[]
+            {
+                "Chamando o Jira com estas credenciais...",
+                "Calling Jira with these credentials..."
+            },
+            [K.MsgAgentEnvTestOk] = new[]
+            {
+                "Autenticado no Jira como {0}. O agente consegue usar estas credenciais.",
+                "Authenticated with Jira as {0}. The agent can use these credentials."
+            },
+            [K.MsgAgentEnvTestFailed] = new[]
+            {
+                "O Jira recusou ou não respondeu: {0}",
+                "Jira refused or did not answer: {0}"
+            },
+            [K.MsgAgentEnvApiKeyWarning] = new[]
+            {
+                "Atenção: ANTHROPIC_API_KEY definida aqui faz as execuções serem cobradas por token, mesmo com \"usar somente o plano\" ligado — uma chave escrita neste arquivo é tratada como intencional.",
+                "Careful: an ANTHROPIC_API_KEY set here makes runs billed per token even with \"plan only\" on — a key written in this file is treated as deliberate."
+            },
+            [K.AgentPlanOnlyLabel] = new[]
+            {
+                "Usar somente o plano (sem cobrança por token)",
+                "Use the plan only (no per-token billing)"
+            },
+            [K.AgentPlanOnlyHint] = new[]
+            {
+                "Remove ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL e afins antes de chamar a CLI, para a execução entrar com a conta em que você já está logado. Desligue só se quiser cobrar uma conta de API de propósito.",
+                "Clears ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL and friends before calling the CLI, so the run signs in with the account you are already logged into. Turn it off only to bill an API account on purpose."
+            },
+            [K.AgentCostMeaningNote] = new[]
+            {
+                "O valor em US$ é o que a CLI reporta como equivalente daqueles tokens no preço da API — referência, não fatura. Logado no seu plano, ele consome a cota e não gera cobrança extra; com uma API Key no ambiente, aí sim seria cobrado, e é isso que a opção acima evita.",
+                "The US$ figure is what the CLI reports as those tokens' equivalent at API prices — a reference, not an invoice. Signed into your plan it consumes quota and adds no charge; with an API key in the environment it would be billed, which is what the option above prevents."
             },
         };
 
@@ -1451,6 +1492,14 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAgentEnvNoConnection = "MsgAgentEnvNoConnection";
             public const string MsgAgentEnvJiraOk = "MsgAgentEnvJiraOk";
             public const string MsgAgentEnvJiraMissing = "MsgAgentEnvJiraMissing";
+            public const string BtnAgentEnvTest = "BtnAgentEnvTest";
+            public const string MsgAgentEnvTesting = "MsgAgentEnvTesting";
+            public const string MsgAgentEnvTestOk = "MsgAgentEnvTestOk";
+            public const string MsgAgentEnvTestFailed = "MsgAgentEnvTestFailed";
+            public const string MsgAgentEnvApiKeyWarning = "MsgAgentEnvApiKeyWarning";
+            public const string AgentPlanOnlyLabel = "AgentPlanOnlyLabel";
+            public const string AgentPlanOnlyHint = "AgentPlanOnlyHint";
+            public const string AgentCostMeaningNote = "AgentCostMeaningNote";
         }
     }
 }

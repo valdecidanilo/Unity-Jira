@@ -105,6 +105,43 @@ namespace OxenteGames.JiraCommunication.Skills
         }
 
         /// <summary>
+        /// True when the installed instructions no longer match what this version of
+        /// the package generates.
+        /// </summary>
+        public static bool IsOutdated(string provider, string repositoryRoot)
+        {
+            if (!IsInstalled(provider, repositoryRoot))
+                return false;
+
+            try
+            {
+                string installed = File.ReadAllText(ResolvePath(provider, repositoryRoot));
+                return installed.IndexOf(BuildBody(provider).Trim(), StringComparison.Ordinal) < 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Rewrites already-installed instructions that have drifted.
+        /// </summary>
+        /// <remarks>
+        /// Only when they are already installed: generating them is the developer's
+        /// decision, and a package that writes files into a repository nobody asked it
+        /// to touch is a package people stop trusting. Once that decision is made,
+        /// though, stale text is worse than no text — instructions from an older
+        /// version told the agent it had no Jira credentials and should not try the
+        /// API, which is the opposite of what the env file now arranges.
+        /// </remarks>
+        public static void RefreshIfInstalled(string provider, string repositoryRoot)
+        {
+            if (IsOutdated(provider, repositoryRoot))
+                Install(provider, repositoryRoot);
+        }
+
+        /// <summary>
         /// The instruction body, shared by both providers. Only the surrounding file
         /// format differs between them.
         /// </summary>

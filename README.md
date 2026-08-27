@@ -258,6 +258,39 @@ livre; **escrever** (transição, comentário, edição) só quando a tarefa ped
 que a janela do Unity é o caminho normal para isso; e o token nunca deve aparecer
 em resposta, arquivo ou commit.
 
+### O agente chamando o Jira, na prática
+
+Uma execução headless **não tem quem responda a um pedido de permissão** — o que
+não estiver liberado de antemão é negado no meio da tarefa. Por isso, quando o
+`.env` tem as três chaves preenchidas, o run recebe `--allowedTools "Bash(curl *)"`:
+uma permissão só, e apenas nesse caso. Dá para desligar em Configurações.
+
+As **instruções do projeto** são regeradas sozinhas quando estão desatualizadas.
+Versões antigas diziam ao agente que ele não tinha credencial do Jira e não devia
+tentar a API; com o `.env` preenchido isso está errado, e um arquivo velho fazia o
+agente recusar a consulta mesmo com tudo configurado.
+
+Se ainda assim falhar, o botão **Testar conexão** no card do `.env` chama
+`/rest/api/3/myself` com aquelas credenciais, **pelo mesmo shell que a execução
+usa**, e mostra o nome autenticado ou a resposta literal do Jira — 401 de token
+errado, HTML de URL errada, ou o erro do próprio `curl`.
+
+### Cobrança: o agente usa o seu plano
+
+O número em `≈ US$ …` que aparece ao fim de cada turno é o que a CLI reporta como
+**equivalente daqueles tokens no preço da API**. É referência, não fatura: logado
+no seu plano, a execução consome a cota e não gera cobrança extra.
+
+O que geraria é uma credencial de API no ambiente — `ANTHROPIC_API_KEY`,
+`ANTHROPIC_BASE_URL`, Bedrock/Vertex. Uma delas exportada no perfil da máquina
+meses atrás é suficiente para todo run virar chamada cobrada, sem nenhum sinal na
+janela. Por isso a opção **Usar somente o plano** vem ligada: o script lançador
+limpa essas variáveis antes de chamar a CLI. Desligue só se quiser cobrar uma
+conta de API de propósito.
+
+A exceção é declarar `ANTHROPIC_API_KEY` dentro do próprio `.env` — aí é
+intencional, a chave é mantida, e o card avisa na tela.
+
 ### Dois caminhos de cobrança, um por recurso
 
 O package tem **duas integrações de IA que não se misturam**, e cada uma tem o seu

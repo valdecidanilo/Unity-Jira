@@ -30,6 +30,8 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AgentEnvPathKey = BaseKey + "Agent.EnvPath";
         private const string AgentTokenBudgetKey = BaseKey + "Agent.TokenBudget";
         private const string AgentWindowHoursKey = BaseKey + "Agent.UsageWindowHours";
+        private const string AgentPlanOnlyKey = BaseKey + "Agent.PlanOnly";
+        private const string AgentJiraToolKey = BaseKey + "Agent.JiraTool";
         private const string GitEnabledKey = BaseKey + "Git.Enabled";
         private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
         private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
@@ -232,6 +234,39 @@ namespace OxenteGames.JiraCommunication.Settings
         public static void SetAgentModel(string provider, string value)
         {
             EditorPrefs.SetString(AgentModelKey + "." + provider, value ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Keeps a run on the developer's subscription by removing the variables that
+        /// would send it to a billed API account instead.
+        /// </summary>
+        /// <remarks>
+        /// On by default, and the reason is money: an <c>ANTHROPIC_API_KEY</c> left in
+        /// the machine's environment silently switches Claude Code from the plan the
+        /// developer is logged into to pay-per-token billing, and a background run
+        /// started from a button in the Editor is exactly where that goes unnoticed.
+        /// Turn it off only to deliberately bill an API account.
+        /// </remarks>
+        public static bool AgentPlanOnly
+        {
+            get => EditorPrefs.GetBool(AgentPlanOnlyKey, true);
+            set => EditorPrefs.SetBool(AgentPlanOnlyKey, value);
+        }
+
+        /// <summary>
+        /// Pre-approves the Jira read command for headless runs.
+        /// </summary>
+        /// <remarks>
+        /// A headless run has nobody to answer a permission prompt, so a tool that
+        /// would ask is simply denied — which is what made the agent report that it
+        /// could not reach Jira even with the credentials in its environment. This
+        /// allows one specific command, and only while the env file actually carries
+        /// a Jira connection.
+        /// </remarks>
+        public static bool AgentJiraTool
+        {
+            get => EditorPrefs.GetBool(AgentJiraToolKey, true);
+            set => EditorPrefs.SetBool(AgentJiraToolKey, value);
         }
 
         /// <summary>
