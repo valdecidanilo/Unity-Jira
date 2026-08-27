@@ -123,10 +123,10 @@ e roda comandos.
 
 ### Como usar
 
-1. Escolha o agente no dropdown **Agente** do card *CLI do agente* (Claude Code
-   ou Codex). Essa escolha é **independente** do Assistente de IA das
-   Configurações: aquele usa API Key e é cobrado por token, este usa a CLI com a
-   conta em que você já está logado e consome o seu plano.
+1. Em `Configurações → Agente local`, escolha o agente no dropdown **Agente**
+   (Claude Code ou Codex). Essa escolha é **independente** do Assistente de IA:
+   aquele usa API Key e é cobrado por token, este usa a CLI com a conta em que
+   você já está logado e consome o seu plano.
 
    **Se você usa o app desktop do Claude, provavelmente não precisa instalar nada.**
    O app já traz um `claude` completo em
@@ -141,14 +141,16 @@ e roda comandos.
    A ordem de busca é: caminho informado manualmente → PATH → instalações
    conhecidas (npm etc.) → bundle do app desktop. Uma CLI que **você** instalou
    sempre ganha da cópia gerenciada pelo app, cuja pasta muda a cada atualização.
-2. Abra `Jira → Jira Workspace → Agente`. O card **CLI do agente** mostra qual
-   binário foi encontrado e a versão; se nada aparecer, informe o caminho
-   manualmente.
+2. Ainda em Configurações, o status logo abaixo do dropdown mostra qual binário
+   foi encontrado e a versão; se nada aparecer, informe o caminho manualmente.
 3. Clique em **Gerar / atualizar** em *Instruções do projeto*. Isso escreve a
    convenção de branch/commit configurada e os cuidados de Unity em:
    - Claude: `.claude/skills/jira-unity/SKILL.md`
    - Codex: bloco delimitado em `AGENTS.md` (o resto do arquivo é preservado)
-4. Escreva a tarefa, escolha as **permissões** e clique em **Executar em background**.
+
+   O card mostra o caminho completo do arquivo e tem **Abrir no explorador**.
+4. Abra `Jira → Jira Workspace → Agente`, escreva a mensagem, escolha as
+   **permissões** e envie (**Enter** envia, **Shift+Enter** quebra linha).
 
 Na aba **Atividades**, o botão **Enviar para o agente** leva chave, título,
 descrição e o nome do branch da convenção já preenchidos.
@@ -177,21 +179,64 @@ nem perde uma execução, e a transcrição fica disponível para replay depois.
 O botão **Abrir no terminal** existe para uma sessão interativa; ela
 deliberadamente **não** entra no histórico, porque não há stream para acompanhar.
 
-### Custo: continuar em vez de recomeçar
+### A aba é um chat
 
-Cada execução nova é uma sessão nova — paga o contexto inicial inteiro de novo.
-Para um próximo passo sobre o mesmo trabalho, escreva a instrução no campo
-**Tarefa** e use **Continuar esta execução** na transcrição: o prompt enviado é só
-a instrução, e a sessão retomada já tem o enquadramento e tudo que o agente leu.
+A aba Agente é uma conversa: você escreve, o agente responde, e a **próxima
+mensagem continua a mesma sessão da CLI** — não há botão de "continuar". Isso é o
+que segura o custo: uma sessão retomada já tem o enquadramento do projeto e tudo
+que o agente leu, então o prompt enviado é só a instrução seguinte. Começar de
+novo pagaria esse contexto inteiro outra vez.
 
-O botão fica ativo quando a execução terminou e reportou um id de sessão. Codex
-não aparece aqui: `codex exec` não tem flag de retomada, e o package prefere
-esconder a ação a emitir uma flag que a CLI recusaria.
+Cada turno ainda é um processo próprio — é isso que sobrevive a uma recompilação —
+e os turnos aparecem como uma conversa só porque compartilham o mesmo `threadId`.
+Quando a sessão **não** pode ser retomada (o turno anterior falhou antes de
+reportar um id, ou a CLI não tem retomada — `codex exec` não tem), a mensagem
+inicia um turno novo dentro da mesma conversa, em vez de virar um beco sem saída.
 
-O dropdown **Modelo** permite fixar um modelo mais barato para tarefas mecânicas.
-O padrão é **“Padrão da CLI”**, que não envia `--model` — o package não sobrescreve
-a sua configuração sem você pedir. Uma execução continuada mantém o modelo da
-sessão original; trocar no meio descartaria o contexto que se quis reaproveitar.
+**Nova conversa** começa um assunto do zero. **Histórico** lista as conversas, com
+recarregar, copiar resultado, abrir a pasta da execução e excluir a conversa.
+
+Os passos da CLI ficam recolhidos em uma linha por turno (`▸ 14 passos da CLI ·
+Read Player.cs`), que abre no clique e continua aberta. São detalhe de
+diagnóstico: expandidos, empurravam a resposta para fora da tela.
+
+O dropdown **Modelo**, em Configurações, permite fixar um modelo mais barato para
+tarefas mecânicas. O padrão é **“Padrão da CLI”**, que não envia `--model` — o
+package não sobrescreve a sua configuração sem você pedir. Uma conversa retomada
+mantém o modelo com que começou; trocar no meio descartaria o contexto que se
+quis reaproveitar.
+
+### Tokens: consumo, porcentagem e reset
+
+A barra da aba Agente mostra os tokens consumidos na janela atual, a porcentagem
+que resta e o horário do reset, com a contagem para ele.
+
+Os números vêm do que a **própria CLI reporta** ao fim de cada execução (entrada,
+saída e cache), gravados em `Library/JiraAgent/usage.jsonl` — então sobrevivem ao
+fechamento do Unity. A janela funciona como nos planos Claude: abre na primeira
+execução depois de um intervalo sem uso e dura N horas (5 por padrão).
+
+**Nenhuma CLI informa a cota real da sua conta.** Por isso a porcentagem é medida
+contra um **limite de tokens que você define** em `Configurações → Consumo de
+tokens`, junto com a duração da janela. Com limite zero a aba mostra só os números
+brutos, em vez de inventar um denominador. É uma estimativa do uso desta máquina
+neste projeto, não uma leitura da sua conta.
+
+### Variáveis do agente (`.env`)
+
+`Configurações → Variáveis do agente` edita, dentro da janela, um arquivo `.env`
+cujas variáveis são **exportadas para a CLI antes de cada execução** (por exemplo
+`ANTHROPIC_MODEL`, `MAX_THINKING_TOKENS`, `BASH_DEFAULT_TIMEOUT_MS`).
+
+A exportação acontece no próprio script lançador, não no lado do Editor: a
+execução é um processo destacado, e um environment montado aqui não chegaria até
+ele. Uma variável por linha, `CHAVE=valor`, sem interpolação — o valor vai
+literal.
+
+O padrão é `.env` na raiz do repositório, e o caminho é configurável (relativo
+parte da raiz; absoluto é usado como está). Como o arquivo mora no repositório,
+ele serve para configuração que o time compartilha — **não** para segredo que não
+possa ser commitado.
 
 ### Dois caminhos de cobrança, um por recurso
 
@@ -201,7 +246,7 @@ próprio seletor de provedor:
 | Recurso | Onde escolhe | Credencial | Cobrança |
 | --- | --- | --- | --- |
 | Assistente de IA (preenche título/descrição) | `Configurações → Assistente de IA` | API Key sua | por token |
-| Agente local (trabalha no repositório) | aba `Agente → CLI do agente` | nenhuma; a CLI usa o seu login | o seu plano |
+| Agente local (trabalha no repositório) | `Configurações → Agente local` | nenhuma; a CLI usa o seu login | o seu plano |
 
 Escolher ChatGPT no Assistente **não** faz o agente procurar o Codex — são
 configurações separadas, de propósito.

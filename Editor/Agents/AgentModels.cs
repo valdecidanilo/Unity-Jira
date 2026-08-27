@@ -80,6 +80,9 @@ namespace OxenteGames.JiraCommunication.Agents
         /// <summary>Reported cost in USD, when the CLI provides it.</summary>
         public double CostUsd;
 
+        /// <summary>Token counters reported with a terminal result event.</summary>
+        public AgentUsage Usage;
+
         /// <summary>True when a <see cref="AgentEventKind.Result"/> ended in failure.</summary>
         public bool IsError;
 
@@ -91,6 +94,35 @@ namespace OxenteGames.JiraCommunication.Agents
                 Text = text ?? string.Empty,
                 Detail = detail ?? string.Empty
             };
+        }
+    }
+
+    /// <summary>
+    /// Token counters for one run, as reported by the CLI.
+    /// </summary>
+    /// <remarks>
+    /// Cached reads are kept apart from fresh input because they are what a resumed
+    /// session mostly consumes, and folding them into one number would make a cheap
+    /// follow-up look as expensive as the run that built the context.
+    /// </remarks>
+    internal struct AgentUsage
+    {
+        public long InputTokens;
+        public long OutputTokens;
+        public long CacheReadTokens;
+        public long CacheWriteTokens;
+
+        /// <summary>Everything the run moved through the model, cache included.</summary>
+        public long Total => InputTokens + OutputTokens + CacheReadTokens + CacheWriteTokens;
+
+        public bool HasData => Total > 0;
+
+        public void Add(AgentUsage other)
+        {
+            InputTokens += other.InputTokens;
+            OutputTokens += other.OutputTokens;
+            CacheReadTokens += other.CacheReadTokens;
+            CacheWriteTokens += other.CacheWriteTokens;
         }
     }
 
@@ -126,6 +158,18 @@ namespace OxenteGames.JiraCommunication.Agents
 
         /// <summary>Short label shown in the run list.</summary>
         public string Title = string.Empty;
+
+        /// <summary>
+        /// What the developer typed, without the surrounding framing. Stored so the
+        /// chat can show the message that produced a run instead of the whole prompt.
+        /// </summary>
+        public string Instruction = string.Empty;
+
+        /// <summary>
+        /// Conversation this run belongs to — the run id of the first turn. Empty on a
+        /// fresh conversation, in which case the run adopts its own id.
+        /// </summary>
+        public string ThreadId = string.Empty;
 
         /// <summary>
         /// Permission posture passed to the CLI. Kept as a plain string because the
@@ -231,6 +275,16 @@ namespace OxenteGames.JiraCommunication.Agents
         public string Title = string.Empty;
         public string IssueKey = string.Empty;
 
+        /// <summary>The developer's own message for this turn, for the chat bubble.</summary>
+        public string Instruction = string.Empty;
+
+        /// <summary>
+        /// Conversation this run belongs to. Every turn of a continued session shares
+        /// the first run's id, which is what lets the chat show one thread instead of
+        /// a list of unrelated runs.
+        /// </summary>
+        public string ThreadId = string.Empty;
+
         /// <summary>
         /// CLI session id reported by the run, and the handle used to continue it.
         /// Empty until the CLI emits its init event.
@@ -259,6 +313,9 @@ namespace OxenteGames.JiraCommunication.Agents
 
         public double DurationMs;
         public double CostUsd;
+
+        /// <summary>Tokens this run reported. Zero until it produces a result event.</summary>
+        public AgentUsage Usage;
 
         public bool IsRunning => Status == AgentRunStatus.Running;
 

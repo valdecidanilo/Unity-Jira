@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using UnityEditor;
 
@@ -25,6 +26,10 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AgentCliPathKey = BaseKey + "Agent.CliPath";
         private const string AgentPermissionKey = BaseKey + "Agent.Permission";
         private const string AgentModelKey = BaseKey + "Agent.Model";
+        private const string AgentEnvEnabledKey = BaseKey + "Agent.EnvEnabled";
+        private const string AgentEnvPathKey = BaseKey + "Agent.EnvPath";
+        private const string AgentTokenBudgetKey = BaseKey + "Agent.TokenBudget";
+        private const string AgentWindowHoursKey = BaseKey + "Agent.UsageWindowHours";
         private const string GitEnabledKey = BaseKey + "Git.Enabled";
         private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
         private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
@@ -227,6 +232,64 @@ namespace OxenteGames.JiraCommunication.Settings
         public static void SetAgentModel(string provider, string value)
         {
             EditorPrefs.SetString(AgentModelKey + "." + provider, value ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Whether the project's env file is exported into the agent process.
+        /// </summary>
+        /// <remarks>
+        /// On by default: a repository with no env file simply exports nothing, and a
+        /// team that put one there did so to have it used. The switch exists so a
+        /// developer can rule the file out while diagnosing a run.
+        /// </remarks>
+        public static bool AgentEnvEnabled
+        {
+            get => EditorPrefs.GetBool(AgentEnvEnabledKey, true);
+            set => EditorPrefs.SetBool(AgentEnvEnabledKey, value);
+        }
+
+        /// <summary>
+        /// Env file location. Empty means <c>.env</c> at the repository root; a
+        /// relative value resolves from there, an absolute one is used as given.
+        /// </summary>
+        public static string AgentEnvPath
+        {
+            get => EditorPrefs.GetString(AgentEnvPathKey, string.Empty);
+            set => EditorPrefs.SetString(AgentEnvPathKey, value ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Tokens the developer expects to have per quota window.
+        /// </summary>
+        /// <remarks>
+        /// A local figure, not a reading of the plan: no CLI reports the account's
+        /// remaining quota, so the percentage in the agent tab is measured against
+        /// this. Zero turns the percentage off and leaves the raw counters, which is
+        /// the honest state for someone who has not calibrated a number yet.
+        /// </remarks>
+        public static long AgentTokenBudget
+        {
+            get
+            {
+                string stored = EditorPrefs.GetString(AgentTokenBudgetKey, "0");
+                return long.TryParse(stored, out long value) && value > 0 ? value : 0;
+            }
+            set => EditorPrefs.SetString(AgentTokenBudgetKey,
+                (value > 0 ? value : 0).ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// Length of a quota window in hours. Defaults to the five-hour cycle the
+        /// Claude plans use.
+        /// </summary>
+        public static int AgentUsageWindowHours
+        {
+            get
+            {
+                int stored = EditorPrefs.GetInt(AgentWindowHoursKey, 5);
+                return stored < 1 ? 1 : (stored > 168 ? 168 : stored);
+            }
+            set => EditorPrefs.SetInt(AgentWindowHoursKey, value < 1 ? 1 : value);
         }
 
         // --- Git / GitHub integration ---

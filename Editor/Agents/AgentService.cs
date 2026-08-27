@@ -120,10 +120,19 @@ namespace OxenteGames.JiraCommunication.Agents
 
             // An in-flight run must resume streaming immediately; finished ones are
             // hydrated only when the user opens them, so a long history costs nothing.
+            // The exception is a run recent enough to still count against the current
+            // quota window and never accounted for — its tokens only exist inside its
+            // stream, so leaving it unread would under-report usage after a restart.
+            DateTime usageHorizon = DateTime.UtcNow.AddHours(
+                -Math.Max(1, JiraPreferences.AgentUsageWindowHours));
+
             foreach (AgentRunInfo run in RunList)
             {
-                if (run.IsRunning)
+                if (run.IsRunning ||
+                    (run.StartedAtUtc >= usageHorizon && !AgentUsageLedger.HasRecorded(run.RunId)))
+                {
                     Hydrate(run);
+                }
             }
         }
 
@@ -222,7 +231,8 @@ namespace OxenteGames.JiraCommunication.Agents
                 IAgentRunner runner = CreateRunner(request.Provider);
                 string commandLine = runner.BuildCommandLine(request);
                 AgentRunStore.WriteScript(paths,
-                    AgentScript.Build(paths, request.WorkingDirectory, commandLine));
+                    AgentScript.Build(paths, request.WorkingDirectory, commandLine,
+                        AgentEnvFile.Load(request.WorkingDirectory)));
             }
             catch (Exception exception)
             {
@@ -250,6 +260,8 @@ namespace OxenteGames.JiraCommunication.Agents
                 Provider = request.Provider,
                 Title = request.Title,
                 IssueKey = request.IssueKey,
+                Instruction = request.Instruction ?? string.Empty,
+                ThreadId = string.IsNullOrWhiteSpace(request.ThreadId) ? runId : request.ThreadId,
                 Model = request.Model ?? string.Empty,
                 ResumedFrom = request.ResumeSessionId ?? string.Empty,
                 StartedAtUtc = startedAt,
@@ -325,6 +337,77 @@ namespace OxenteGames.JiraCommunication.Agents
 
             string repoRoot = await GitClient.GetRepoRootAsync(projectRoot);
             return string.IsNullOrWhiteSpace(repoRoot) ? projectRoot : repoRoot;
+        }
+
+        /// <summary>
+        /// Every run of one conversation, oldest first.
+        /// </summary>
+        /// <remarks>
+        /// A conversation is several runs because each turn is its own detached
+        /// process — that is what keeps a turn alive across a domain reload. The thread
+        /// id is what stitches them back into the single exchange the developer had.
+        /// </remarks>
+        public static List<AgentRunInfo> Thread(string threadId)
+        {
+            EnsureRestored();
+            var turns = new List<AgentRunInfo>();
+
+            if (string.IsNullOrWhiteSpace(threadId))
+                return turns;
+
+            foreach (AgentRunInfo run in RunList)
+            {
+                if (run.ThreadId == threadId)
+                    turns.Add(run);
+            }
+
+            turns.Reverse();
+            return turns;
+        }
+
+        /// <summary>
+        /// The newest run of every conversation, newest first — one entry per thread.
+        /// </summary>
+        public static List<AgentRunInfo> Threads()
+        {
+            EnsureRestored();
+            var heads = new List<AgentRunInfo>();
+            var seen = new HashSet<string>();
+
+            foreach (AgentRunInfo run in RunList)
+            {
+                string threadId = string.IsNullOrWhiteSpace(run.ThreadId) ? run.RunId : run.ThreadId;
+                if (seen.Add(threadId))
+                    heads.Add(run);
+            }
+
+            return heads;
+        }
+
+        /// <summary>The turn to resume when continuing a conversation, or null.</summary>
+        public static AgentRunInfo LastResumable(string threadId)
+        {
+            List<AgentRunInfo> turns = Thread(threadId);
+
+            for (int i = turns.Count - 1; i >= 0; i--)
+            {
+                if (turns[i].CanContinue)
+                    return turns[i];
+            }
+
+            return null;
+        }
+
+        /// <summary>True while any turn of a conversation is still running.</summary>
+        public static bool IsThreadBusy(string threadId)
+        {
+            foreach (AgentRunInfo run in Thread(threadId))
+            {
+                if (run.IsRunning)
+                    return true;
+            }
+
+            return false;
         }
 
         // --- Pump ------------------------------------------------------------
@@ -436,6 +519,12 @@ namespace OxenteGames.JiraCommunication.Agents
                 run.FinalText = parsed.Text;
                 run.DurationMs = parsed.DurationMs;
                 run.CostUsd = parsed.CostUsd;
+                run.Usage = parsed.Usage;
+
+                // Recorded here rather than on status change: the result event is the
+                // only place the counters exist, and it is seen exactly once per run
+                // whether the run just finished or its stream is being replayed.
+                AgentUsageLedger.Record(run);
             }
 
             return appended;

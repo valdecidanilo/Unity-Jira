@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace OxenteGames.JiraCommunication.Agents
@@ -56,7 +57,8 @@ namespace OxenteGames.JiraCommunication.Agents
     /// </remarks>
     internal static class AgentScript
     {
-        public static string Build(AgentRunPaths paths, string workingDirectory, string commandLine)
+        public static string Build(AgentRunPaths paths, string workingDirectory, string commandLine,
+            IList<AgentEnvVariable> environment = null)
         {
             var sb = new StringBuilder(512);
 
@@ -66,6 +68,7 @@ namespace OxenteGames.JiraCommunication.Agents
                 // Keep the CLI's UTF-8 output intact through the console layer.
                 sb.AppendLine("chcp 65001 > nul");
                 sb.AppendLine("cd /d \"" + workingDirectory + "\"");
+                AppendEnvironment(sb, environment);
 
                 // "call" is mandatory, not stylistic. An npm global install of these
                 // CLIs is a .cmd shim, and a batch file that invokes another .cmd
@@ -86,6 +89,7 @@ namespace OxenteGames.JiraCommunication.Agents
             {
                 sb.AppendLine("#!/bin/sh");
                 sb.AppendLine("cd \"" + workingDirectory + "\" || exit 1");
+                AppendEnvironment(sb, environment);
                 sb.AppendLine(commandLine
                               + " < \"" + paths.Prompt + "\""
                               + " > \"" + paths.Stream + "\""
@@ -94,6 +98,45 @@ namespace OxenteGames.JiraCommunication.Agents
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Emits the env file's variables as shell assignments ahead of the command.
+        /// </summary>
+        /// <remarks>
+        /// Assignment inside the script is what makes the variables visible to a
+        /// detached process: the run is launched by the shell, not by
+        /// <c>ProcessStartInfo</c>, so an environment set on the Editor side would
+        /// never reach the CLI. Values are escaped for the platform shell and any
+        /// newline is dropped, because a value that broke out of its assignment would
+        /// become an executable line in a script that runs with the developer's own
+        /// permissions.
+        /// </remarks>
+        private static void AppendEnvironment(StringBuilder sb, IList<AgentEnvVariable> environment)
+        {
+            if (environment == null || environment.Count == 0)
+                return;
+
+            foreach (AgentEnvVariable variable in environment)
+            {
+                if (string.IsNullOrWhiteSpace(variable.Key))
+                    continue;
+
+                string value = (variable.Value ?? string.Empty)
+                    .Replace("\r", string.Empty)
+                    .Replace("\n", " ");
+
+                if (AgentShell.IsWindows)
+                {
+                    // cmd has no escape for a quote inside a quoted assignment, so a
+                    // quote is removed rather than silently ending the value early.
+                    sb.AppendLine("set \"" + variable.Key + "=" + value.Replace("\"", string.Empty) + "\"");
+                }
+                else
+                {
+                    sb.AppendLine("export " + variable.Key + "='" + value.Replace("'", "'\\''") + "'");
+                }
+            }
         }
 
         /// <summary>Quotes a path or value for the platform shell.</summary>

@@ -203,7 +203,27 @@ namespace OxenteGames.JiraCommunication.Agents
                 Detail = subtype,
                 IsError = isError || subtype == "error_max_turns" || subtype == "error_during_execution",
                 DurationMs = AgentJson.Number(node, "duration_ms"),
-                CostUsd = AgentJson.Number(node, "total_cost_usd")
+                CostUsd = AgentJson.Number(node, "total_cost_usd"),
+                Usage = ParseUsage(AgentJson.Field(node, "usage"))
+            };
+        }
+
+        /// <summary>
+        /// Reads the result event's token counters. Absent fields stay at zero rather
+        /// than failing the parse: the counter set has changed across CLI versions and
+        /// a transcript is more useful than an exact accounting.
+        /// </summary>
+        private static AgentUsage ParseUsage(object usage)
+        {
+            if (usage == null)
+                return default(AgentUsage);
+
+            return new AgentUsage
+            {
+                InputTokens = (long)AgentJson.Number(usage, "input_tokens"),
+                OutputTokens = (long)AgentJson.Number(usage, "output_tokens"),
+                CacheReadTokens = (long)AgentJson.Number(usage, "cache_read_input_tokens"),
+                CacheWriteTokens = (long)AgentJson.Number(usage, "cache_creation_input_tokens")
             };
         }
 

@@ -105,7 +105,8 @@ namespace OxenteGames.JiraCommunication.Agents
                     Text = FirstText(node) ?? string.Empty,
                     Detail = type,
                     IsError = failed,
-                    CostUsd = AgentJson.Number(usage, "total_cost_usd")
+                    CostUsd = AgentJson.Number(usage, "total_cost_usd"),
+                    Usage = ParseUsage(usage)
                 };
             }
 
@@ -130,6 +131,24 @@ namespace OxenteGames.JiraCommunication.Agents
             return string.IsNullOrWhiteSpace(fallback)
                 ? (string.IsNullOrWhiteSpace(type) ? null : AgentEvent.Simple(AgentEventKind.Unknown, type))
                 : AgentEvent.Simple(AgentEventKind.Text, fallback);
+        }
+
+        /// <summary>
+        /// Token counters from a turn's usage block. Codex names cached input
+        /// differently from Claude Code, which is the whole reason each runner maps
+        /// its own dialect instead of the store guessing at field names.
+        /// </summary>
+        private static AgentUsage ParseUsage(object usage)
+        {
+            if (usage == null)
+                return default(AgentUsage);
+
+            return new AgentUsage
+            {
+                InputTokens = (long)AgentJson.Number(usage, "input_tokens"),
+                OutputTokens = (long)AgentJson.Number(usage, "output_tokens"),
+                CacheReadTokens = (long)AgentJson.Number(usage, "cached_input_tokens")
+            };
         }
 
         private static AgentEvent ParseItem(object item, string envelopeType)

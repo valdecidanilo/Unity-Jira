@@ -162,6 +162,12 @@ namespace OxenteGames.JiraCommunication.Agents
             sb.Append(',');
             Append(sb, "issueKey", request.IssueKey);
             sb.Append(',');
+            Append(sb, "instruction", request.Instruction);
+            sb.Append(',');
+            Append(sb, "threadId", string.IsNullOrWhiteSpace(request.ThreadId)
+                ? paths.RunId
+                : request.ThreadId);
+            sb.Append(',');
             Append(sb, "permissionMode", request.PermissionMode);
             sb.Append(',');
             Append(sb, "workingDirectory", request.WorkingDirectory);
@@ -369,6 +375,14 @@ namespace OxenteGames.JiraCommunication.Agents
                     info.Provider = AgentJson.String(node, "provider") ?? AgentProvider.ClaudeCode;
                     info.Title = AgentJson.String(node, "title") ?? string.Empty;
                     info.IssueKey = AgentJson.String(node, "issueKey") ?? string.Empty;
+                    info.Instruction = AgentJson.String(node, "instruction") ?? string.Empty;
+
+                    // Runs written before threads existed have no id; they stand alone,
+                    // which is exactly what adopting their own run id expresses.
+                    info.ThreadId = AgentJson.String(node, "threadId");
+                    if (string.IsNullOrWhiteSpace(info.ThreadId))
+                        info.ThreadId = runId;
+
                     info.Model = AgentJson.String(node, "model") ?? string.Empty;
                     info.ResumedFrom = AgentJson.String(node, "resumedFrom") ?? string.Empty;
                     info.ProcessId = (int)AgentJson.Number(node, "processId");

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0 - 2026-08-27
+
+- **Aba Agente virou chat.** A conversa é o centro da aba: você escreve, o agente responde, e a próxima mensagem continua a mesma sessão da CLI automaticamente (sem botão "continuar"). Enter envia, Shift+Enter quebra linha. Cada turno continua sendo um processo separado — é isso que sobrevive a recompilação — e o `threadId` da execução é o que costura os turnos numa única conversa na tela.
+- **Terminal compacto.** Os passos da CLI (ferramentas, raciocínio, erros) saíram do meio da tela e viraram uma linha por turno — `▸ 14 passos da CLI · Read Player.cs` — que abre e fecha no clique e continua aberta enquanto você lê. A resposta do agente ficou visível sem rolagem.
+- **Medidor de tokens** na barra da aba: consumido na janela atual, porcentagem restante com barra colorida, e o horário do reset com a contagem para ele. Os números vêm do que a própria CLI reporta ao fim de cada execução, cache incluído, e ficam num livro-caixa em `Library/JiraAgent/usage.jsonl` que sobrevive ao fechamento do Unity.
+- **Janela de cota** no modelo dos planos Claude: abre na primeira execução depois de um intervalo sem uso e dura N horas (5 por padrão, configurável). Nenhuma CLI informa a cota real da conta, então a porcentagem é medida contra um **limite de tokens configurável** — com limite zero, a aba mostra só os números brutos em vez de inventar um denominador.
+- **Configurações → Agente local** reúne o que é configuração e não conversa: provedor, caminho da CLI, modelo, diagnóstico, o **local do arquivo de instruções** (`.claude/skills/jira-unity/SKILL.md` ou `AGENTS.md`) com botão para abrir onde ele está, o limite de tokens e a duração da janela.
+- **Arquivo `.env` do agente**, editável na própria janela: as variáveis são exportadas no script de lançamento antes de chamar a CLI, então chegam ao processo destacado (um environment montado no lado do Editor não chegaria). Caminho configurável (padrão `.env` na raiz do repositório), botões de salvar/recarregar/exemplo/abrir, contagem de variáveis e um aviso de que o arquivo mora no repositório.
+- **Histórico por conversa** em vez de por execução, com recarregar, copiar resultado, abrir a pasta e excluir a conversa inteira.
+
 ## 0.9.1 - 2026-08-25
 
 - **Detecção de plataforma em runtime** no lugar do define `UNITY_EDITOR_WIN`. Toda decisão de shell, caminho e lançador do agente dependia desse define; se ele faltasse numa compilação, tudo caía no ramo Unix (shell `/bin/sh`, busca em `/usr/local/bin`) e uma máquina com a CLI perfeitamente instalada reportava "não encontrado". A checagem em runtime não falha assim, e não usa API do Unity — o inicializador pode rodar em thread de background.

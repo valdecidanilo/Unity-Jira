@@ -733,6 +733,262 @@ namespace OxenteGames.JiraCommunication.Localization
                 "This feature uses no API Key. The CLI signs in with the account you are already logged into, "
                 + "consuming your plan — independent of the AI Assistant in Settings, which is billed per token."
             },
+
+            [K.AgentCliReady] = new[]
+            {
+                "pronto",
+                "ready"
+            },
+            [K.AgentCliMissingShort] = new[]
+            {
+                "{0} não encontrado",
+                "{0} not found"
+            },
+            [K.AgentCliMissingHint] = new[]
+            {
+                "Instale a CLI ou informe o caminho dela em Configurações > Agente local.",
+                "Install the CLI or set its path in Settings > Local agent."
+            },
+            [K.BtnAgentNewChat] = new[]
+            {
+                "Nova conversa",
+                "New chat"
+            },
+            [K.BtnAgentHistory] = new[]
+            {
+                "Histórico",
+                "History"
+            },
+            [K.BtnAgentConfigure] = new[]
+            {
+                "Configurar",
+                "Configure"
+            },
+            [K.BtnAgentSend] = new[]
+            {
+                "Enviar",
+                "Send"
+            },
+            [K.BtnAgentDeleteChat] = new[]
+            {
+                "Excluir conversa",
+                "Delete chat"
+            },
+            [K.BtnAgentUnlinkIssue] = new[]
+            {
+                "Desvincular",
+                "Unlink"
+            },
+            [K.AgentChatEmpty] = new[]
+            {
+                "Escreva a primeira mensagem abaixo. O agente roda em background, na pasta do repositório, e cada resposta continua a mesma sessão da CLI.",
+                "Write the first message below. The agent runs in the background, in the repository folder, and each reply continues the same CLI session."
+            },
+            [K.AgentComposerHint] = new[]
+            {
+                "Enter envia · Shift+Enter quebra linha. As permissões acima valem para a próxima mensagem.",
+                "Enter sends · Shift+Enter adds a line. The permission above applies to the next message."
+            },
+            [K.AgentYou] = new[]
+            {
+                "Você",
+                "You"
+            },
+            [K.AgentActivitySteps] = new[]
+            {
+                "{0} passos da CLI",
+                "{0} CLI steps"
+            },
+            [K.AgentMetaTokens] = new[]
+            {
+                "{0} tokens",
+                "{0} tokens"
+            },
+            [K.MsgAgentBusy] = new[]
+            {
+                "O agente ainda está trabalhando nesta conversa. Aguarde ou cancele a execução.",
+                "The agent is still working on this chat. Wait for it or cancel the run."
+            },
+            [K.AgentUsageIdle] = new[]
+            {
+                "tokens: janela livre",
+                "tokens: window clear"
+            },
+            [K.AgentUsageNoBudget] = new[]
+            {
+                "{0} tokens nesta janela · sem limite definido",
+                "{0} tokens this window · no budget set"
+            },
+            [K.AgentUsageSummary] = new[]
+            {
+                "{0} usados · restam {1}% ({2})",
+                "{0} used · {1}% left ({2})"
+            },
+            [K.AgentUsageReset] = new[]
+            {
+                "reseta {0} (em {1})",
+                "resets {0} (in {1})"
+            },
+            [K.AgentSettingsTitle] = new[]
+            {
+                "Agente local",
+                "Local agent"
+            },
+            [K.AgentSkillPathLabel] = new[]
+            {
+                "Arquivo de instruções ({0})",
+                "Instructions file ({0})"
+            },
+            [K.BtnAgentOpenSkill] = new[]
+            {
+                "Abrir no explorador",
+                "Reveal file"
+            },
+            [K.AgentEnvTitle] = new[]
+            {
+                "Variáveis do agente (.env)",
+                "Agent environment (.env)"
+            },
+            [K.AgentEnvNote] = new[]
+            {
+                "Estas variáveis são exportadas para a CLI antes de cada execução. O arquivo fica no repositório, então o time inteiro usa a mesma configuração.",
+                "These variables are exported to the CLI before every run. The file lives in the repository, so the whole team shares the same configuration."
+            },
+            [K.AgentEnvEnabledLabel] = new[]
+            {
+                "Exportar o .env nas execuções",
+                "Export the .env on every run"
+            },
+            [K.AgentEnvPathLabel] = new[]
+            {
+                "Arquivo (opcional)",
+                "File (optional)"
+            },
+            [K.AgentEnvPathHint] = new[]
+            {
+                "Vazio usa {0} na raiz do repositório. Caminho relativo parte da raiz; absoluto é usado como está.",
+                "Empty uses {0} at the repository root. A relative path starts there; an absolute one is used as given."
+            },
+            [K.AgentEnvSecretsNote] = new[]
+            {
+                "Uma variável por linha, no formato CHAVE=valor. Sem interpolação: o valor vai literal para o processo. Lembre que o arquivo fica no repositório — não coloque segredo que não possa ser commitado.",
+                "One variable per line, KEY=value. No interpolation: the value reaches the process literally. The file lives in the repository — do not put a secret there that cannot be committed."
+            },
+            [K.BtnAgentEnvSave] = new[]
+            {
+                "Salvar .env",
+                "Save .env"
+            },
+            [K.BtnAgentEnvReload] = new[]
+            {
+                "Recarregar",
+                "Reload"
+            },
+            [K.BtnAgentEnvTemplate] = new[]
+            {
+                "Inserir exemplo",
+                "Insert example"
+            },
+            [K.BtnAgentEnvReveal] = new[]
+            {
+                "Abrir no explorador",
+                "Reveal file"
+            },
+            [K.MsgAgentEnvPath] = new[]
+            {
+                "Arquivo: {0}",
+                "File: {0}"
+            },
+            [K.MsgAgentEnvPathAbsent] = new[]
+            {
+                "Ainda não existe: {0}",
+                "Does not exist yet: {0}"
+            },
+            [K.MsgAgentEnvVars] = new[]
+            {
+                "{0} variáveis serão exportadas.",
+                "{0} variables will be exported."
+            },
+            [K.MsgAgentEnvDisabled] = new[]
+            {
+                "Exportação desligada: nenhuma variável é enviada.",
+                "Export is off: no variable is sent."
+            },
+            [K.MsgAgentEnvSaved] = new[]
+            {
+                "Gravado em {0}",
+                "Written to {0}"
+            },
+            [K.MsgAgentEnvFailed] = new[]
+            {
+                "Não foi possível gravar: {0}",
+                "Could not write: {0}"
+            },
+            [K.MsgAgentEnvMissing] = new[]
+            {
+                "O arquivo ainda não existe. Salve antes de abrir.",
+                "The file does not exist yet. Save it before opening."
+            },
+            [K.MsgAgentEnvTemplate] = new[]
+            {
+                "Exemplo inserido. Ajuste e salve.",
+                "Example inserted. Adjust it and save."
+            },
+            [K.AgentBudgetTitle] = new[]
+            {
+                "Consumo de tokens",
+                "Token usage"
+            },
+            [K.AgentBudgetNote] = new[]
+            {
+                "Nenhuma CLI informa quanto resta do plano, então a aba Agente mede o consumo desta máquina contra o limite abaixo e agrupa por janela.",
+                "No CLI reports the plan's remaining quota, so the Agent tab measures this machine's consumption against the budget below and groups it per window."
+            },
+            [K.AgentBudgetLabel] = new[]
+            {
+                "Limite de tokens por janela",
+                "Token budget per window"
+            },
+            [K.AgentBudgetHint] = new[]
+            {
+                "Zero desliga a porcentagem e deixa só os números brutos.",
+                "Zero turns the percentage off and leaves the raw counters."
+            },
+            [K.AgentWindowHoursLabel] = new[]
+            {
+                "Duração da janela (horas)",
+                "Window length (hours)"
+            },
+            [K.AgentWindowHoursHint] = new[]
+            {
+                "5 horas é o ciclo dos planos Claude. A janela abre na primeira execução após um intervalo sem uso e o reset é o fim dela.",
+                "5 hours is the Claude plans' cycle. A window opens with the first run after a quiet period and the reset is its end."
+            },
+            [K.BtnAgentClearUsage] = new[]
+            {
+                "Zerar histórico de consumo",
+                "Clear usage history"
+            },
+            [K.MsgAgentUsageCleared] = new[]
+            {
+                "Histórico de consumo apagado.",
+                "Usage history cleared."
+            },
+            [K.MsgAgentUsageIdle] = new[]
+            {
+                "Nenhuma janela ativa: o limite está inteiro.",
+                "No active window: the budget is whole."
+            },
+            [K.MsgAgentUsageWindow] = new[]
+            {
+                "{0} tokens em {1} execuções · janela {2} → {3} · US$ {4}",
+                "{0} tokens across {1} runs · window {2} → {3} · US$ {4}"
+            },
+            [K.AgentUsageEstimateNote] = new[]
+            {
+                "Os números vêm do que a própria CLI reporta ao fim de cada execução, contando cache. É uma estimativa local do uso deste projeto, não uma leitura da sua conta.",
+                "The numbers come from what the CLI itself reports at the end of each run, cache included. It is a local estimate of this project's usage, not a reading of your account."
+            },
         };
 
         internal static class K
@@ -1106,6 +1362,58 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAgentDiagnosticsCopied = "MsgAgentDiagnosticsCopied";
             public const string AgentProviderLabel = "AgentProviderLabel";
             public const string AgentNoApiKeyNote = "AgentNoApiKeyNote";
+
+            public const string AgentCliReady = "AgentCliReady";
+            public const string AgentCliMissingShort = "AgentCliMissingShort";
+            public const string AgentCliMissingHint = "AgentCliMissingHint";
+            public const string BtnAgentNewChat = "BtnAgentNewChat";
+            public const string BtnAgentHistory = "BtnAgentHistory";
+            public const string BtnAgentConfigure = "BtnAgentConfigure";
+            public const string BtnAgentSend = "BtnAgentSend";
+            public const string BtnAgentDeleteChat = "BtnAgentDeleteChat";
+            public const string BtnAgentUnlinkIssue = "BtnAgentUnlinkIssue";
+            public const string AgentChatEmpty = "AgentChatEmpty";
+            public const string AgentComposerHint = "AgentComposerHint";
+            public const string AgentYou = "AgentYou";
+            public const string AgentActivitySteps = "AgentActivitySteps";
+            public const string AgentMetaTokens = "AgentMetaTokens";
+            public const string MsgAgentBusy = "MsgAgentBusy";
+            public const string AgentUsageIdle = "AgentUsageIdle";
+            public const string AgentUsageNoBudget = "AgentUsageNoBudget";
+            public const string AgentUsageSummary = "AgentUsageSummary";
+            public const string AgentUsageReset = "AgentUsageReset";
+            public const string AgentSettingsTitle = "AgentSettingsTitle";
+            public const string AgentSkillPathLabel = "AgentSkillPathLabel";
+            public const string BtnAgentOpenSkill = "BtnAgentOpenSkill";
+            public const string AgentEnvTitle = "AgentEnvTitle";
+            public const string AgentEnvNote = "AgentEnvNote";
+            public const string AgentEnvEnabledLabel = "AgentEnvEnabledLabel";
+            public const string AgentEnvPathLabel = "AgentEnvPathLabel";
+            public const string AgentEnvPathHint = "AgentEnvPathHint";
+            public const string AgentEnvSecretsNote = "AgentEnvSecretsNote";
+            public const string BtnAgentEnvSave = "BtnAgentEnvSave";
+            public const string BtnAgentEnvReload = "BtnAgentEnvReload";
+            public const string BtnAgentEnvTemplate = "BtnAgentEnvTemplate";
+            public const string BtnAgentEnvReveal = "BtnAgentEnvReveal";
+            public const string MsgAgentEnvPath = "MsgAgentEnvPath";
+            public const string MsgAgentEnvPathAbsent = "MsgAgentEnvPathAbsent";
+            public const string MsgAgentEnvVars = "MsgAgentEnvVars";
+            public const string MsgAgentEnvDisabled = "MsgAgentEnvDisabled";
+            public const string MsgAgentEnvSaved = "MsgAgentEnvSaved";
+            public const string MsgAgentEnvFailed = "MsgAgentEnvFailed";
+            public const string MsgAgentEnvMissing = "MsgAgentEnvMissing";
+            public const string MsgAgentEnvTemplate = "MsgAgentEnvTemplate";
+            public const string AgentBudgetTitle = "AgentBudgetTitle";
+            public const string AgentBudgetNote = "AgentBudgetNote";
+            public const string AgentBudgetLabel = "AgentBudgetLabel";
+            public const string AgentBudgetHint = "AgentBudgetHint";
+            public const string AgentWindowHoursLabel = "AgentWindowHoursLabel";
+            public const string AgentWindowHoursHint = "AgentWindowHoursHint";
+            public const string BtnAgentClearUsage = "BtnAgentClearUsage";
+            public const string MsgAgentUsageCleared = "MsgAgentUsageCleared";
+            public const string MsgAgentUsageIdle = "MsgAgentUsageIdle";
+            public const string MsgAgentUsageWindow = "MsgAgentUsageWindow";
+            public const string AgentUsageEstimateNote = "AgentUsageEstimateNote";
         }
     }
 }

@@ -113,6 +113,7 @@ namespace OxenteGames.JiraCommunication
 
         // Owns event subscriptions, so it must be disposed whenever the UI is rebuilt.
         private AgentConsoleView _agentConsole;
+        private AgentSettingsView _agentSettings;
         private Tab _activeTab = Tab.Connection;
 
         // Create tab - core
@@ -417,6 +418,7 @@ namespace OxenteGames.JiraCommunication
             // its AgentService subscriptions or it would keep updating dead elements.
             _agentConsole?.Dispose();
             _agentConsole = null;
+            _agentSettings = null;
             _loaderAnimation?.Pause();
             _loaderSpinners.Clear();
             _destinationIsLoading = false;
@@ -6890,14 +6892,10 @@ namespace OxenteGames.JiraCommunication
 
         private VisualElement BuildAgentPanel()
         {
-            // Repaint for live transcript updates; the rebuild callback is for changes
-            // that swap the panel's per-provider fields, matching how the settings tab
-            // rebuilds on a provider or language change.
-            _agentConsole = new AgentConsoleView(Repaint, () =>
-            {
-                _activeTab = Tab.Agent;
-                CreateGUI();
-            });
+            // Repaint for live chat updates. Configuration is not built here any more:
+            // the toolbar's configure button jumps to the settings tab, where
+            // AgentSettingsView owns those fields.
+            _agentConsole = new AgentConsoleView(Repaint, () => SelectTab(Tab.Settings));
             return _agentConsole.Build();
         }
 
@@ -6962,6 +6960,7 @@ namespace OxenteGames.JiraCommunication
             panel.Add(languageCard);
 
             panel.Add(BuildAiSettingsCard());
+            panel.Add(BuildAgentSettingsCard());
             panel.Add(BuildGitSettingsCard());
 
             var dataCard = new VisualElement();
@@ -6990,6 +6989,25 @@ namespace OxenteGames.JiraCommunication
                 OnStyledDropdownPointerDown,
                 TrickleDown.TrickleDown);
             return panel;
+        }
+
+        /// <summary>
+        /// The local agent's configuration: CLI, model, project instructions, env file
+        /// and token budget.
+        /// </summary>
+        /// <remarks>
+        /// Built by its own view rather than inline here. These are the fields the
+        /// agent tab used to carry, and they were crowding out the conversation.
+        /// </remarks>
+        private VisualElement BuildAgentSettingsCard()
+        {
+            _agentSettings = new AgentSettingsView(Repaint, () =>
+            {
+                _activeTab = Tab.Settings;
+                CreateGUI();
+            });
+
+            return _agentSettings.Build();
         }
 
         private VisualElement BuildAiSettingsCard()

@@ -749,6 +749,281 @@ namespace OxenteGames.JiraCommunication.UI
             button.style.borderBottomColor = Border;
         }
 
+        // --- Agent chat ------------------------------------------------------
+
+        /// <summary>Single compact row of controls, used as the agent tab's toolbar.</summary>
+        public static void ApplyToolbar(VisualElement bar)
+        {
+            bar.style.flexDirection = FlexDirection.Row;
+            bar.style.alignItems = Align.Center;
+            bar.style.flexWrap = Wrap.Wrap;
+            bar.style.backgroundColor = Surface;
+            bar.style.paddingLeft = 8;
+            bar.style.paddingRight = 8;
+            bar.style.paddingTop = 6;
+            bar.style.paddingBottom = 6;
+            bar.style.marginBottom = 6;
+            bar.style.borderTopLeftRadius = 6;
+            bar.style.borderTopRightRadius = 6;
+            bar.style.borderBottomLeftRadius = 6;
+            bar.style.borderBottomRightRadius = 6;
+            bar.style.borderLeftWidth = 1;
+            bar.style.borderRightWidth = 1;
+            bar.style.borderTopWidth = 1;
+            bar.style.borderBottomWidth = 1;
+            bar.style.borderLeftColor = Border;
+            bar.style.borderRightColor = Border;
+            bar.style.borderTopColor = Border;
+            bar.style.borderBottomColor = Border;
+        }
+
+        /// <summary>Small button that fits inside a toolbar row.</summary>
+        public static void ApplyToolbarButton(Button button, bool primary)
+        {
+            button.style.height = 22;
+            button.style.minWidth = 0;
+            button.style.marginLeft = 0;
+            button.style.marginRight = 4;
+            button.style.marginTop = 1;
+            button.style.marginBottom = 1;
+            button.style.paddingLeft = 8;
+            button.style.paddingRight = 8;
+            button.style.fontSize = 10;
+            button.style.unityFontStyleAndWeight = primary ? FontStyle.Bold : FontStyle.Normal;
+            button.style.color = primary ? Accent : TextSecondary;
+            button.style.backgroundColor = primary
+                ? new Color(Accent.r, Accent.g, Accent.b, 0.16f)
+                : SurfaceRaised;
+            button.style.borderTopLeftRadius = 4;
+            button.style.borderTopRightRadius = 4;
+            button.style.borderBottomLeftRadius = 4;
+            button.style.borderBottomRightRadius = 4;
+            button.style.borderLeftWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            Color border = primary ? new Color(Accent.r, Accent.g, Accent.b, 0.45f) : Border;
+            button.style.borderLeftColor = border;
+            button.style.borderRightColor = border;
+            button.style.borderTopColor = border;
+            button.style.borderBottomColor = border;
+        }
+
+        /// <summary>Inline text inside a toolbar: a status, a path, a counter.</summary>
+        public static void ApplyToolbarText(Label label, JiraTone tone)
+        {
+            label.style.color = tone == JiraTone.Neutral ? TextSecondary : ToneColor(tone);
+            label.style.fontSize = 10;
+            label.style.marginRight = 10;
+            label.style.flexShrink = 1;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            label.style.overflow = Overflow.Hidden;
+        }
+
+        /// <summary>Track of the token meter. The fill is a child sized by percentage.</summary>
+        public static void ApplyMeterTrack(VisualElement track)
+        {
+            track.style.height = 5;
+            track.style.width = 110;
+            track.style.marginRight = 8;
+            track.style.backgroundColor = Background;
+            track.style.borderTopLeftRadius = 3;
+            track.style.borderTopRightRadius = 3;
+            track.style.borderBottomLeftRadius = 3;
+            track.style.borderBottomRightRadius = 3;
+            track.style.overflow = Overflow.Hidden;
+            track.style.flexShrink = 0;
+        }
+
+        public static void ApplyMeterFill(VisualElement fill, float fraction, JiraTone tone)
+        {
+            fill.style.height = 5;
+            fill.style.width = Length.Percent(Mathf.Clamp01(fraction) * 100f);
+            fill.style.backgroundColor = ToneColor(tone);
+            fill.style.borderTopLeftRadius = 3;
+            fill.style.borderTopRightRadius = 3;
+            fill.style.borderBottomLeftRadius = 3;
+            fill.style.borderBottomRightRadius = 3;
+        }
+
+        /// <summary>The chat surface. Grows with the window instead of a fixed box.</summary>
+        public static void ApplyChatScroll(ScrollView scroll)
+        {
+            scroll.style.flexGrow = 1;
+            scroll.style.minHeight = 220;
+            scroll.style.backgroundColor = Background;
+            scroll.style.marginBottom = 6;
+            scroll.style.borderTopLeftRadius = 6;
+            scroll.style.borderTopRightRadius = 6;
+            scroll.style.borderBottomLeftRadius = 6;
+            scroll.style.borderBottomRightRadius = 6;
+            scroll.style.borderLeftWidth = 1;
+            scroll.style.borderRightWidth = 1;
+            scroll.style.borderTopWidth = 1;
+            scroll.style.borderBottomWidth = 1;
+            scroll.style.borderLeftColor = Border;
+            scroll.style.borderRightColor = Border;
+            scroll.style.borderTopColor = Border;
+            scroll.style.borderBottomColor = Border;
+            scroll.style.paddingLeft = 8;
+            scroll.style.paddingRight = 8;
+            scroll.style.paddingTop = 8;
+            scroll.style.paddingBottom = 8;
+        }
+
+        /// <summary>A chat message. The developer's turns are accented and indented.</summary>
+        public static void ApplyBubble(Label label, bool fromUser)
+        {
+            label.style.color = TextPrimary;
+            label.style.fontSize = 11;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.backgroundColor = fromUser
+                ? new Color(Accent.r, Accent.g, Accent.b, 0.16f)
+                : SurfaceRaised;
+            label.style.paddingLeft = 10;
+            label.style.paddingRight = 10;
+            label.style.paddingTop = 7;
+            label.style.paddingBottom = 7;
+            label.style.marginTop = 2;
+            label.style.marginBottom = 2;
+            label.style.marginLeft = fromUser ? 40 : 0;
+            label.style.marginRight = fromUser ? 0 : 40;
+            label.style.borderTopLeftRadius = 8;
+            label.style.borderTopRightRadius = 8;
+            label.style.borderBottomLeftRadius = fromUser ? 8 : 2;
+            label.style.borderBottomRightRadius = fromUser ? 2 : 8;
+        }
+
+        /// <summary>Caption above a message: who spoke and when.</summary>
+        public static void ApplyBubbleCaption(Label label, bool fromUser)
+        {
+            label.style.color = fromUser ? Accent : TextSecondary;
+            label.style.fontSize = 9;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.marginTop = 8;
+            label.style.marginBottom = 1;
+            label.style.marginLeft = fromUser ? 40 : 0;
+        }
+
+        /// <summary>
+        /// The one-line summary of what the agent is doing, which expands into the
+        /// full step log.
+        /// </summary>
+        public static void ApplyActivityToggle(Button button, bool expanded)
+        {
+            button.style.height = 20;
+            button.style.marginLeft = 0;
+            button.style.marginRight = 40;
+            button.style.marginTop = 2;
+            button.style.marginBottom = 2;
+            button.style.paddingLeft = 8;
+            button.style.paddingRight = 8;
+            button.style.fontSize = 9;
+            button.style.unityTextAlign = TextAnchor.MiddleLeft;
+            button.style.color = TextSecondary;
+            button.style.backgroundColor = expanded ? SurfaceRaised : Color.clear;
+            button.style.borderTopLeftRadius = 4;
+            button.style.borderTopRightRadius = 4;
+            button.style.borderBottomLeftRadius = 4;
+            button.style.borderBottomRightRadius = 4;
+            button.style.borderLeftWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderTopWidth = 1;
+            button.style.borderBottomWidth = 1;
+            button.style.borderLeftColor = Border;
+            button.style.borderRightColor = Border;
+            button.style.borderTopColor = Border;
+            button.style.borderBottomColor = Border;
+        }
+
+        /// <summary>Expanded step log under an activity toggle.</summary>
+        public static void ApplyActivityLog(VisualElement log)
+        {
+            log.style.marginLeft = 8;
+            log.style.marginRight = 40;
+            log.style.marginBottom = 4;
+            log.style.paddingLeft = 8;
+            log.style.paddingTop = 4;
+            log.style.paddingBottom = 4;
+            log.style.borderLeftWidth = 1;
+            log.style.borderLeftColor = Border;
+        }
+
+        /// <summary>Small metadata line under a turn: duration, tokens, cost.</summary>
+        public static void ApplyTurnMeta(Label label)
+        {
+            label.style.color = TextSecondary;
+            label.style.fontSize = 9;
+            label.style.marginTop = 2;
+            label.style.marginBottom = 6;
+            label.style.whiteSpace = WhiteSpace.Normal;
+        }
+
+        /// <summary>The message box at the bottom of the chat.</summary>
+        public static void ApplyComposer(TextField field)
+        {
+            field.multiline = true;
+            field.style.flexGrow = 1;
+            field.style.minHeight = 54;
+            field.style.marginBottom = 0;
+            field.style.marginRight = 6;
+            field.style.color = TextPrimary;
+            field.style.whiteSpace = WhiteSpace.Normal;
+        }
+
+        /// <summary>Send button beside the composer.</summary>
+        public static void ApplySendButton(Button button)
+        {
+            button.style.height = 54;
+            button.style.width = 92;
+            button.style.marginLeft = 0;
+            button.style.marginRight = 0;
+            button.style.backgroundColor = Accent;
+            button.style.color = Color.white;
+            button.style.fontSize = 11;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.borderTopLeftRadius = 6;
+            button.style.borderTopRightRadius = 6;
+            button.style.borderBottomLeftRadius = 6;
+            button.style.borderBottomRightRadius = 6;
+            button.style.borderLeftWidth = 0;
+            button.style.borderRightWidth = 0;
+            button.style.borderTopWidth = 0;
+            button.style.borderBottomWidth = 0;
+        }
+
+        /// <summary>Small pill carrying a value, such as the linked issue key.</summary>
+        public static void ApplyChip(Label label, JiraTone tone)
+        {
+            Color color = ToneColor(tone);
+            label.style.color = color;
+            label.style.fontSize = 9;
+            label.style.marginRight = 6;
+            label.style.paddingLeft = 6;
+            label.style.paddingRight = 6;
+            label.style.paddingTop = 1;
+            label.style.paddingBottom = 1;
+            label.style.backgroundColor = new Color(color.r, color.g, color.b, 0.14f);
+            label.style.borderTopLeftRadius = 4;
+            label.style.borderTopRightRadius = 4;
+            label.style.borderBottomLeftRadius = 4;
+            label.style.borderBottomRightRadius = 4;
+            label.style.flexShrink = 0;
+        }
+
+        /// <summary>Compact dropdown for a toolbar, without its label column.</summary>
+        public static void ApplyMiniDropdown(DropdownField dropdown)
+        {
+            ApplyDropdown(dropdown);
+            dropdown.style.marginBottom = 0;
+            dropdown.style.marginRight = 6;
+            dropdown.style.minWidth = 132;
+            dropdown.style.flexGrow = 0;
+
+            if (dropdown.labelElement != null)
+                dropdown.labelElement.style.display = DisplayStyle.None;
+        }
+
         /// <summary>Horizontal container for a group of buttons.</summary>
         public static void ApplyButtonRow(VisualElement row)
         {
