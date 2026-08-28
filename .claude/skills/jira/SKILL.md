@@ -108,7 +108,7 @@ Sempre resuma em tabela/texto legível. **Nunca despeje o JSON cru** no chat.
 
 ```
 whoami | projects | types <PROJ> | mine | url <KEY>
-search "<JQL>" [max] | view <KEY> | transitions <KEY>
+search "<JQL>" [max] | view <KEY> | transitions <KEY> | flat <KEY>
 create <PROJ> <TIPO> <TITULO> [DESC]
 start  <PROJ> <TIPO> <TITULO> [DESC]   # cria + assume + em andamento + branch sugerido
 branch <KEY>                           # nome de branch a partir do card
@@ -118,6 +118,8 @@ comment <KEY> <TEXTO> | edit <KEY> <TITULO> | desc <KEY> <TEXTO> | assign <KEY> 
 
 ## Detalhes
 
+- Dependências: só `bash`, `curl` e `awk`. Nada de python/jq.
+- `flat <KEY>` devolve a issue como linhas `caminho<TAB>valor` (ex.: `fields.status.name<TAB>Em progresso`) — use com `grep`/`awk` quando quiser um campo específico em vez de ler o JSON inteiro do `view`.
 - `progress`/`review`/`done` já tentam vários nomes de status (PT e EN). Se falharem, o erro lista as transições reais — escolha a certa e use `move`.
 - Comentários e descrições: texto puro, o helper converte para ADF. Quebras de linha viram parágrafos.
 - Aspas: passe títulos e textos entre aspas duplas, escapando as internas.

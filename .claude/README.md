@@ -55,4 +55,5 @@ Ou seja: dá pra ter um token global na máquina e sobrescrever por repositório
 
 ### Requisitos
 
-`bash`, `curl` e `python` no PATH. No Windows, o Git Bash que vem com o Git já resolve.
+Apenas `bash`, `curl` e `awk` — os tres ja vem no Git Bash (Windows) e em qualquer Mac/Linux.
+Nao precisa de Python nem de jq.
