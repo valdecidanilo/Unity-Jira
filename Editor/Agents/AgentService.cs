@@ -336,20 +336,40 @@ namespace OxenteGames.JiraCommunication.Agents
         /// </summary>
         /// <remarks>
         /// A headless run cannot answer a permission prompt, so anything not allowed
-        /// here is denied mid-task. That is why the list has to name every shape the
-        /// agent will actually reach for: read-only git, plus — when the developer
-        /// left the Jira tool on and the env file carries a connection — the Jira
-        /// skill's helper and raw <c>curl</c>.
+        /// here is denied mid-task. The list therefore has to name every shape the
+        /// agent will actually reach for: the Jira skill, raw <c>curl</c>, and
+        /// read-only git plus the branch commands.
         /// <para>
-        /// Allowing the helper is a deliberate widening. Until it was here the agent
-        /// could read Jira with <c>curl</c> but not create or transition an issue
-        /// through the skill, which is the thing developers ask it for most.
+        /// The package gates this on nothing. Two earlier gates are gone on purpose:
+        /// <c>HasJiraConnection</c>, where a missing or unparsed env file silently
+        /// emptied the whole list, and an <c>Agent.JiraTool</c> EditorPref that had no
+        /// UI behind it — between them the agent could end up unable to reach Jira
+        /// with nothing in the window to explain why, which is what it was reporting.
+        /// The developer's own permission settings still apply; this list only says
+        /// what the package pre-approves.
         /// </para>
         /// </remarks>
         private static string ResolveAllowedTools()
         {
             var patterns = new List<string>
             {
+                // --- Jira -------------------------------------------------------
+                "Bash(curl *)",
+                "Skill(jira)",
+
+                // Several spellings of the same script: the CLI matches a command
+                // prefix literally, and the agent may reach the helper through the
+                // home path, the repository copy, or an absolute path.
+                "Bash(bash *jira.sh *)",
+                "Bash(bash ~/.claude/skills/jira/jira.sh:*)",
+                "Bash(bash .claude/skills/jira/jira.sh:*)",
+                "Bash(sh *jira.sh *)",
+
+                // Lets the agent check that a connection is configured before it
+                // blames the network.
+                "Bash(test -f *jira.env*)",
+
+                // --- git --------------------------------------------------------
                 // Read-only history, and the branch commands the workflow needs.
                 // None of these can lose committed work.
                 "Bash(git status:*)",
@@ -362,19 +382,6 @@ namespace OxenteGames.JiraCommunication.Agents
                 "Bash(git checkout -b:*)",
                 "Bash(git switch -c:*)"
             };
-
-            if (JiraPreferences.AgentJiraTool && AgentEnvFile.HasJiraConnection(AgentEnvFile.Read()))
-            {
-                patterns.Add("Bash(curl *)");
-                patterns.Add("Skill(jira)");
-
-                // Three spellings of the same script: the CLI matches a command
-                // prefix literally, and the agent may reach the helper through the
-                // home path, the repository copy, or an absolute path.
-                patterns.Add("Bash(bash *jira.sh *)");
-                patterns.Add("Bash(bash ~/.claude/skills/jira/jira.sh:*)");
-                patterns.Add("Bash(bash .claude/skills/jira/jira.sh:*)");
-            }
 
             return string.Join(",", patterns.ToArray());
         }

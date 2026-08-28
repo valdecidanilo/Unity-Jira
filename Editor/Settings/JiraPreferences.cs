@@ -31,7 +31,6 @@ namespace OxenteGames.JiraCommunication.Settings
         private const string AgentTokenBudgetKey = BaseKey + "Agent.TokenBudget";
         private const string AgentWindowHoursKey = BaseKey + "Agent.UsageWindowHours";
         private const string AgentPlanOnlyKey = BaseKey + "Agent.PlanOnly";
-        private const string AgentJiraToolKey = BaseKey + "Agent.JiraTool";
         private const string GitEnabledKey = BaseKey + "Git.Enabled";
         private const string GitRepoPathKey = BaseKey + "Git.RepoPath";
         private const string GitBaseBranchKey = BaseKey + "Git.BaseBranch";
@@ -209,15 +208,22 @@ namespace OxenteGames.JiraCommunication.Settings
         }
 
         /// <summary>
-        /// Permission posture for headless runs. Defaults to the read-only "plan"
-        /// posture so that enabling the feature cannot silently modify the project
-        /// before the developer has chosen to allow it.
+        /// Permission posture for headless runs.
         /// </summary>
+        /// <remarks>
+        /// Defaults to "accept edits" — the posture the feature is actually for. It
+        /// used to default to the read-only "plan" posture, on the reasoning that
+        /// enabling the feature should not silently modify the project; in practice
+        /// that made a fresh install answer every request with a plan and refuse to
+        /// act, which reads as the agent being broken rather than as a safety choice.
+        /// The dropdown in the agent console still offers "plan" for developers who
+        /// want it, and the run is a git working tree either way.
+        /// </remarks>
         public static string AgentPermission
         {
-            get => EditorPrefs.GetString(AgentPermissionKey, Agents.AgentPermission.Plan);
+            get => EditorPrefs.GetString(AgentPermissionKey, Agents.AgentPermission.AcceptEdits);
             set => EditorPrefs.SetString(AgentPermissionKey,
-                string.IsNullOrEmpty(value) ? Agents.AgentPermission.Plan : value);
+                string.IsNullOrEmpty(value) ? Agents.AgentPermission.AcceptEdits : value);
         }
 
         /// <summary>
@@ -251,23 +257,6 @@ namespace OxenteGames.JiraCommunication.Settings
         {
             get => EditorPrefs.GetBool(AgentPlanOnlyKey, true);
             set => EditorPrefs.SetBool(AgentPlanOnlyKey, value);
-        }
-
-        /// <summary>
-        /// Pre-approves the Jira commands for headless runs.
-        /// </summary>
-        /// <remarks>
-        /// A headless run has nobody to answer a permission prompt, so a tool that
-        /// would ask is simply denied — which is what made the agent report that it
-        /// could not reach Jira even with the credentials in its environment. This
-        /// allows the Jira skill's helper and raw curl, and only while the env file
-        /// actually carries a Jira connection. Turn it off and the agent can still do
-        /// the code work; it just cannot touch Jira.
-        /// </remarks>
-        public static bool AgentJiraTool
-        {
-            get => EditorPrefs.GetBool(AgentJiraToolKey, true);
-            set => EditorPrefs.SetBool(AgentJiraToolKey, value);
         }
 
         /// <summary>
