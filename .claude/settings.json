@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(jira)",
+      "Bash(bash .claude/skills/jira/jira.sh:*)",
+      "Bash(bash ./.claude/skills/jira/jira.sh:*)",
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git symbolic-ref:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git switch -c:*)"
+    ]
+  }
+}

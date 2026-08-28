@@ -38,6 +38,15 @@ Depois disso, é só falar normalmente com o Claude Code:
 
 Comandos manuais do helper: `bash .claude/skills/jira/jira.sh` sem argumentos lista todos.
 
+### Permissões
+
+O `.claude/settings.json` versionado já libera a skill e os comandos `git` de leitura,
+para o Claude Code não pedir aprovação a cada chamada. Na primeira vez que você abrir
+o repo, o Claude Code pergunta se confia nas configurações do projeto — aceite.
+
+Preferências pessoais que não devem ir pro repo: use `.claude/settings.local.json`
+(já está no `.gitignore`).
+
 ### Precedência de config
 
 `$JIRA_ENV` → `<raiz-do-repo>/.claude/jira.env` → `~/.claude/jira.env`
