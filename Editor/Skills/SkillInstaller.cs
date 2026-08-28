@@ -40,10 +40,11 @@ namespace OxenteGames.JiraCommunication.Skills
     /// agent is told to follow are the ones actually configured in the Jira window,
     /// instead of a copy that silently drifts.
     /// <para>
-    /// Deliberately absent: any Jira credential. The generated instructions tell the
-    /// agent that Jira reads and writes happen in the Unity window, which already
-    /// holds the token. An agent that cannot reach Jira cannot leak the token, and it
-    /// does not need Jira access to do the code work anyway.
+    /// Deliberately absent: the credential itself. The instructions point at the env
+    /// file the agent already has exported, and tell it which Jira commands are
+    /// pre-approved for a headless run, so it does not fall back to reporting that it
+    /// cannot reach Jira. They also spell out that the token is never echoed, written
+    /// to a file, or committed.
     /// </para>
     /// </remarks>
     internal static class SkillInstaller
@@ -182,16 +183,23 @@ namespace OxenteGames.JiraCommunication.Skills
             sb.AppendLine("When you need Jira context the prompt does not carry — the issue, an epic by");
             sb.AppendLine("name, comments, linked issues — fetch it yourself:");
             sb.AppendLine();
-            sb.AppendLine("Use `curl` for it. A run started from Unity is headless and only that");
-            sb.AppendLine("command is pre-approved, so a helper script would be denied mid-task:");
+            sb.AppendLine("The `jira` skill's helper is pre-approved for runs started from Unity, so");
+            sb.AppendLine("reach for it first — headless or interactive, it is the same command:");
+            sb.AppendLine();
+            sb.AppendLine("```sh");
+            sb.AppendLine("bash ~/.claude/skills/jira/jira.sh view KEY-123      # tambem: mine, search, flat");
+            sb.AppendLine("bash ~/.claude/skills/jira/jira.sh start PROJ Task \"Titulo\" \"Descricao\"");
+            sb.AppendLine("bash ~/.claude/skills/jira/jira.sh progress KEY-123  # tambem: review, done, comment");
+            sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("`start` creates the issue, assigns it to the developer, moves it to in-progress");
+            sb.AppendLine("and hands back the branch name to use. Raw `curl` is pre-approved too, for");
+            sb.AppendLine("anything the helper does not cover:");
             sb.AppendLine();
             sb.AppendLine("```sh");
             sb.AppendLine("curl -s -u \"$JIRA_EMAIL:$JIRA_API_TOKEN\" \\");
             sb.AppendLine("  \"$JIRA_URL/rest/api/3/search?jql=summary~%22Fortune%20Locks%22\"");
             sb.AppendLine("```");
-            sb.AppendLine();
-            sb.AppendLine("In an interactive session the `jira` skill's helper is shorter:");
-            sb.AppendLine("`bash ~/.claude/skills/jira/jira.sh view KEY-123`, `... mine`, `... search`.");
             sb.AppendLine();
             sb.AppendLine("Finding an issue **by name** is a JQL search, not a `GET /issue/<name>` — that");
             sb.AppendLine("endpoint only takes a key or id, and calling it with a title returns 404, which");
@@ -199,9 +207,13 @@ namespace OxenteGames.JiraCommunication.Skills
             sb.AppendLine();
             sb.AppendLine("Rules for that access:");
             sb.AppendLine();
-            sb.AppendLine("- Reading is free. **Writing** — transitions, comments, edits — only when the");
-            sb.AppendLine("  task explicitly asks. The developer normally does those in the Jira Workspace");
-            sb.AppendLine("  window, and an unrequested transition fights whatever they are doing there.");
+            sb.AppendLine("- Reading is free. **Writing** — creating an issue, transitioning, commenting —");
+            sb.AppendLine("  is expected when the task calls for it: asked for a new activity or a branch,");
+            sb.AppendLine("  create the card and move it to in-progress; asked what was done, comment the");
+            sb.AppendLine("  progress on the card. Do it, then report — do not ask permission first.");
+            sb.AppendLine("- Two exceptions: do not move a card to **done** unless the work is finished");
+            sb.AppendLine("  and verified, and do not transition a card the task never mentioned — the");
+            sb.AppendLine("  developer may be working it in the Jira Workspace window right now.");
             sb.AppendLine("- Never echo the token, and never write it into a file, a commit or your answer.");
             sb.AppendLine("- If the file or a variable is missing, say so instead of guessing a URL: the");
             sb.AppendLine("  developer fills it in under Settings > Agent credentials in the Unity window.");

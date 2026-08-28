@@ -335,19 +335,48 @@ namespace OxenteGames.JiraCommunication.Agents
         /// Tool patterns handed to the CLI as pre-approved for headless runs.
         /// </summary>
         /// <remarks>
-        /// Only the Jira read command, and only when the env file actually carries a
-        /// connection. A headless run cannot answer a permission prompt, so anything
-        /// not allowed here is denied mid-task — but an allow-list is a standing
-        /// permission, so it stays as narrow as the feature needs.
+        /// A headless run cannot answer a permission prompt, so anything not allowed
+        /// here is denied mid-task. That is why the list has to name every shape the
+        /// agent will actually reach for: read-only git, plus — when the developer
+        /// left the Jira tool on and the env file carries a connection — the Jira
+        /// skill's helper and raw <c>curl</c>.
+        /// <para>
+        /// Allowing the helper is a deliberate widening. Until it was here the agent
+        /// could read Jira with <c>curl</c> but not create or transition an issue
+        /// through the skill, which is the thing developers ask it for most.
+        /// </para>
         /// </remarks>
         private static string ResolveAllowedTools()
         {
-            if (!JiraPreferences.AgentJiraTool)
-                return string.Empty;
+            var patterns = new List<string>
+            {
+                // Read-only history, and the branch commands the workflow needs.
+                // None of these can lose committed work.
+                "Bash(git status:*)",
+                "Bash(git log:*)",
+                "Bash(git diff:*)",
+                "Bash(git branch:*)",
+                "Bash(git rev-parse:*)",
+                "Bash(git symbolic-ref:*)",
+                "Bash(git fetch:*)",
+                "Bash(git checkout -b:*)",
+                "Bash(git switch -c:*)"
+            };
 
-            return AgentEnvFile.HasJiraConnection(AgentEnvFile.Read())
-                ? "Bash(curl *)"
-                : string.Empty;
+            if (JiraPreferences.AgentJiraTool && AgentEnvFile.HasJiraConnection(AgentEnvFile.Read()))
+            {
+                patterns.Add("Bash(curl *)");
+                patterns.Add("Skill(jira)");
+
+                // Three spellings of the same script: the CLI matches a command
+                // prefix literally, and the agent may reach the helper through the
+                // home path, the repository copy, or an absolute path.
+                patterns.Add("Bash(bash *jira.sh *)");
+                patterns.Add("Bash(bash ~/.claude/skills/jira/jira.sh:*)");
+                patterns.Add("Bash(bash .claude/skills/jira/jira.sh:*)");
+            }
+
+            return string.Join(",", patterns.ToArray());
         }
 
         /// <summary>

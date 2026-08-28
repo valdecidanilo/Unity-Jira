@@ -254,14 +254,15 @@ namespace OxenteGames.JiraCommunication.Settings
         }
 
         /// <summary>
-        /// Pre-approves the Jira read command for headless runs.
+        /// Pre-approves the Jira commands for headless runs.
         /// </summary>
         /// <remarks>
         /// A headless run has nobody to answer a permission prompt, so a tool that
         /// would ask is simply denied — which is what made the agent report that it
         /// could not reach Jira even with the credentials in its environment. This
-        /// allows one specific command, and only while the env file actually carries
-        /// a Jira connection.
+        /// allows the Jira skill's helper and raw curl, and only while the env file
+        /// actually carries a Jira connection. Turn it off and the agent can still do
+        /// the code work; it just cannot touch Jira.
         /// </remarks>
         public static bool AgentJiraTool
         {
