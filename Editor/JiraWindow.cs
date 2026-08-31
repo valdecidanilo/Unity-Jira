@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+using OxenteGames.JiraCommunication.Agents;
 using OxenteGames.JiraCommunication.AI;
 using OxenteGames.JiraCommunication.API;
 using OxenteGames.JiraCommunication.Git;
@@ -26,7 +27,7 @@ namespace OxenteGames.JiraCommunication
             "jira-priority-dropdown-icon";
         private const int ResolveIssuesPerPage = 15;
 
-        private enum Tab { Connection, Create, Resolve, Agent, Settings }
+        private enum Tab { Connection, Create, Resolve, Agent, AiJira, Settings }
 
         private enum ResolveSprintScope
         {
@@ -106,14 +107,17 @@ namespace OxenteGames.JiraCommunication
         private Button _createTab;
         private Button _settingsTab;
         private Button _agentTab;
+        private Button _aiJiraTab;
         private VisualElement _connectionPanel;
         private VisualElement _createPanel;
         private VisualElement _settingsPanel;
         private VisualElement _agentPanel;
+        private VisualElement _aiJiraPanel;
 
         // Owns event subscriptions, so it must be disposed whenever the UI is rebuilt.
         private AgentConsoleView _agentConsole;
         private AgentSettingsView _agentSettings;
+        private AiJiraView _aiJiraView;
         private Tab _activeTab = Tab.Connection;
 
         // Create tab - core
@@ -419,6 +423,7 @@ namespace OxenteGames.JiraCommunication
             _agentConsole?.Dispose();
             _agentConsole = null;
             _agentSettings = null;
+            _aiJiraView = null;
             _loaderAnimation?.Pause();
             _loaderSpinners.Clear();
             _destinationIsLoading = false;
@@ -441,11 +446,13 @@ namespace OxenteGames.JiraCommunication
             _createPanel = BuildCreatePanel();
             _resolvePanel = BuildResolvePanel();
             _agentPanel = BuildAgentPanel();
+            _aiJiraPanel = BuildAiJiraPanel();
             _settingsPanel = BuildSettingsPanel();
             scroll.Add(_connectionPanel);
             scroll.Add(_createPanel);
             scroll.Add(_resolvePanel);
             scroll.Add(_agentPanel);
+            scroll.Add(_aiJiraPanel);
             scroll.Add(_settingsPanel);
 
             BuildBrandFooter();
@@ -457,6 +464,35 @@ namespace OxenteGames.JiraCommunication
             SetConnectionAvailability(false);
             SelectTab(Tab.Connection);
             RefreshConnectionState(tabAfterValidation);
+            RefreshAiJiraAvailability();
+        }
+
+        /// <summary>
+        /// Reveals the ai-jira tab once the probe confirms an install.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately not awaited by <c>CreateGUI</c>: the probe shells out to look
+        /// for a PowerShell host and the GitHub CLI, and blocking the window's first
+        /// paint on that would make every Editor domain reload feel slow for the sake
+        /// of a tab most projects never see.
+        /// </remarks>
+        private async void RefreshAiJiraAvailability()
+        {
+            AiJiraInfo info = await AiJiraLocator.LocateAsync();
+
+            // The window may have been rebuilt — or closed — while the probe was in
+            // flight. Comparing against null catches the destroyed window too, which
+            // is the case where Repaint would throw.
+            if (this == null || _aiJiraTab == null)
+                return;
+
+            _aiJiraTab.style.display = info.Found ? DisplayStyle.Flex : DisplayStyle.None;
+
+            // The tab a domain reload restored may be one this machine cannot show.
+            if (!info.Found && _activeTab == Tab.AiJira)
+                SelectTab(Tab.Connection);
+
+            Repaint();
         }
 
 #if UNITY_EDITOR_WIN
@@ -561,9 +597,14 @@ namespace OxenteGames.JiraCommunication
             _createTab = new Button(() => SelectTab(Tab.Create)) { text = L.Tr(L.K.TabCreate) };
             _resolveTab = new Button(() => SelectTab(Tab.Resolve)) { text = L.Tr(L.K.TabResolve) };
             _agentTab = new Button(() => SelectTab(Tab.Agent)) { text = L.Tr(L.K.TabAgent) };
+            _aiJiraTab = new Button(() => SelectTab(Tab.AiJira)) { text = L.Tr(L.K.TabAiJira) };
             _settingsTab = new Button(() => SelectTab(Tab.Settings)) { text = L.Tr(L.K.TabSettings) };
             _createTab.style.display = DisplayStyle.None;
             _resolveTab.style.display = DisplayStyle.None;
+
+            // ai-jira is installed per machine, outside this project, so the tab is
+            // hidden until the probe finds it rather than shown and then explained.
+            _aiJiraTab.style.display = DisplayStyle.None;
 
             // The agent works on the repository, not on Jira, so it stays reachable
             // even without a validated connection.
@@ -571,6 +612,7 @@ namespace OxenteGames.JiraCommunication
             bar.Add(_createTab);
             bar.Add(_resolveTab);
             bar.Add(_agentTab);
+            bar.Add(_aiJiraTab);
             bar.Add(_settingsTab);
             rootVisualElement.Add(bar);
         }
@@ -583,20 +625,22 @@ namespace OxenteGames.JiraCommunication
                 tab = Tab.Connection;
 
             _activeTab = tab;
-            if (_connectionPanel == null || _createPanel == null ||
-                _resolvePanel == null || _settingsPanel == null || _agentPanel == null)
+            if (_connectionPanel == null || _createPanel == null || _resolvePanel == null ||
+                _settingsPanel == null || _agentPanel == null || _aiJiraPanel == null)
                 return;
 
             _connectionPanel.style.display = tab == Tab.Connection ? DisplayStyle.Flex : DisplayStyle.None;
             _createPanel.style.display = tab == Tab.Create ? DisplayStyle.Flex : DisplayStyle.None;
             _resolvePanel.style.display = tab == Tab.Resolve ? DisplayStyle.Flex : DisplayStyle.None;
             _agentPanel.style.display = tab == Tab.Agent ? DisplayStyle.Flex : DisplayStyle.None;
+            _aiJiraPanel.style.display = tab == Tab.AiJira ? DisplayStyle.Flex : DisplayStyle.None;
             _settingsPanel.style.display = tab == Tab.Settings ? DisplayStyle.Flex : DisplayStyle.None;
 
             JiraStyles.ApplyTab(_connectionTab, tab == Tab.Connection);
             JiraStyles.ApplyTab(_createTab, tab == Tab.Create);
             JiraStyles.ApplyTab(_resolveTab, tab == Tab.Resolve);
             JiraStyles.ApplyTab(_agentTab, tab == Tab.Agent);
+            JiraStyles.ApplyTab(_aiJiraTab, tab == Tab.AiJira);
             JiraStyles.ApplyTab(_settingsTab, tab == Tab.Settings);
 
             if (tab == Tab.Create)
@@ -605,6 +649,8 @@ namespace OxenteGames.JiraCommunication
                 RefreshResolveAvailability();
             else if (tab == Tab.Agent)
                 _agentConsole?.OnShow();
+            else if (tab == Tab.AiJira)
+                _aiJiraView?.OnShow();
         }
 
         // --- Resolve panel -------------------------------------------------
@@ -6897,6 +6943,26 @@ namespace OxenteGames.JiraCommunication
             // AgentSettingsView owns those fields.
             _agentConsole = new AgentConsoleView(Repaint, () => SelectTab(Tab.Settings));
             return _agentConsole.Build();
+        }
+
+        /// <summary>
+        /// The ai-jira panel, whose commands are carried out by the agent tab.
+        /// </summary>
+        /// <remarks>
+        /// Built unconditionally even though the tab may never appear. A panel is a
+        /// few detached visual elements until it is displayed, and building it lazily
+        /// would mean the probe finishing has to construct UI from a callback — the
+        /// shape that produced the disposal bugs <c>CreateGUI</c> now guards against.
+        /// </remarks>
+        private VisualElement BuildAiJiraPanel()
+        {
+            _aiJiraView = new AiJiraView(Repaint, command =>
+            {
+                SelectTab(Tab.Agent);
+                _agentConsole?.RunAiJiraCommand(command);
+            });
+
+            return _aiJiraView.Build();
         }
 
         /// <summary>

@@ -174,6 +174,10 @@ namespace OxenteGames.JiraCommunication.Skills
             sb.AppendLine("unrequested commit competes with what the developer is doing.");
             sb.AppendLine();
 
+            AiJiraInfo? aiJira = AiJiraLocator.Cached;
+            if (aiJira.HasValue && aiJira.Value.Found)
+                AiJiraPrompt.AppendSkillSection(sb, aiJira.Value);
+
             sb.AppendLine("### Jira itself");
             sb.AppendLine();
             sb.AppendLine("Credentials live in `~/.claude/jira.env` — `JIRA_URL`, `JIRA_EMAIL`,");

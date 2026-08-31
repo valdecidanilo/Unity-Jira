@@ -24,6 +24,7 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
   repositório do projeto a partir de uma tarefa ou de uma atividade do Jira, com transcrição ao vivo,
   resultado, histórico e cancelamento. A execução roda em background e sobrevive a recompilação e ao
   fechamento do Unity. Nenhum token novo é armazenado. Ver *Agente local* abaixo.
+- **Integração com o [ai-jira](https://github.com/Mikael-Cavalcanti/ai-jira)**: se o pacote estiver instalado na máquina, uma aba `ai-jira` aparece com um botão por comando (`jira-init`, `jira-card`, `jira-pr`, `jira-sync`), conduzidos pelo agente local. Se não estiver, a aba não existe. Ver *Integração com o ai-jira* abaixo.
 - **Integração Git/GitHub por convenção**: no detalhe de cada atividade, gera o **nome do branch** (`feat/PROJ-123-titulo`) e a **mensagem de commit** Conventional (`feat(PROJ-123): título`), cria/faz checkout do branch localmente e copia os textos — sem enviar nada ao GitHub e sem precisar de token do GitHub.
 - Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA, integração Git/GitHub e limpeza dos dados de conexão salvos.
 - Mensagens amigáveis para erros HTTP comuns.
@@ -311,6 +312,68 @@ desenvolvedor já está logado. O token do Jira só existe em dois lugares, os d
 sob controle do desenvolvedor: o `EditorPrefs` desta máquina (aba Conexão) e o
 `.env` do projeto, se você optar por preenchê-lo para que o agente consulte o Jira.
 Transições e comentários continuam sendo feitos nesta janela por padrão.
+
+## Integração com o ai-jira (aba `ai-jira`)
+
+O [ai-jira](https://github.com/Mikael-Cavalcanti/ai-jira) é um conjunto de scripts
+PowerShell que cria o card a partir do diff, abre e faz merge do pull request pelo
+GitHub CLI e move os cards conforme o estado dos PRs. Ele é instalado **por
+máquina**, fora do projeto Unity, então não dá para declará-lo como dependência
+deste package — a janela procura por ele e revela a aba só quando encontra.
+
+### Como a detecção funciona
+
+Nesta ordem, parando na primeira que tiver `bin/jira-lib.ps1`:
+
+1. a variável `JIRA_CLI_HOME`, que o `install.ps1` do ai-jira exporta (lida no
+   processo **e** no escopo de usuário, para não exigir reiniciar o Unity);
+2. `~/.ai-jira`, que é onde o README dele manda clonar.
+
+Em macOS e Linux a aba nunca aparece: os scripts são PowerShell e não há o que
+rodar lá. O botão **Procurar de novo** repete o probe, e **Copiar diagnóstico** dá
+a trilha completa de busca, com hit/miss por caminho.
+
+### O que a aba faz
+
+Um botão por comando, cada um abrindo uma **conversa nova na aba Agente**. A aba
+não executa script nenhum: as skills do ai-jira foram escritas para serem
+conduzidas por um agente, e um segundo caminho de execução seria um segundo
+conjunto de bugs sem capacidade nova.
+
+Quando a skill precisa de uma escolha — épico, tipo, time, prioridade — o agente
+pergunta na resposta e você responde no chat; o próximo turno continua a mesma
+sessão. É a mesma pausa que o ai-jira faz no terminal, em outra superfície.
+
+### Precedência sobre o helper deste package
+
+Com o ai-jira instalado, as instruções do projeto ganham uma seção dizendo que
+`jira-card`, `jira-pr` e `jira-sync` **têm precedência** sobre o `jira.sh` e sobre
+`curl` cru: elas leem os projetos, campos e status reais da instância do
+`config.json` do próprio ai-jira. O `jira.sh` continua valendo para o que nenhuma
+skill cobre — ler uma issue citada no prompt, buscar por título, comentar.
+
+Sem essa regra o agente fica com dois manuais de Jira no contexto e escolhe um por
+turno, o que faz o mesmo desenvolvedor ter o card criado de dois jeitos diferentes
+em duas mensagens seguidas.
+
+### Credenciais
+
+O ai-jira lê o host do Jira em `JIRA_BASE_URL`; este package sempre gravou
+`JIRA_URL`. Mesmo valor, nome diferente. A execução passa a receber o **alias**,
+mais `JIRA_CLI_HOME` a partir do caminho detectado, sem sobrescrever nada que você
+tenha definido à mão. Na prática: quem já conectou na aba Conexão não precisa
+digitar a URL de novo em nenhum comando do ai-jira.
+
+### O que pode faltar
+
+A aba avisa antes de você esbarrar, e como avisos — não como erros que escondem os
+comandos que ainda funcionam:
+
+| Falta | Consequência |
+| --- | --- |
+| `pwsh` e `powershell` fora do PATH | nenhum comando roda |
+| `gh` fora do PATH | só o `jira-pr` para |
+| skills não registradas para a CLI configurada | o agente não conhece os comandos pelo nome; rode o `install.ps1` do ai-jira de novo |
 
 ## Segurança
 

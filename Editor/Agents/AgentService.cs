@@ -214,9 +214,14 @@ namespace OxenteGames.JiraCommunication.Agents
                 return null;
             }
 
+            // Probed here rather than trusted to have happened in the UI: a run can be
+            // started from a tab that never opened the ai-jira panel, and the result is
+            // cached, so this costs one probe per Editor session.
+            AiJiraInfo aiJira = await AiJiraLocator.LocateAsync();
+
             request.ExecutablePath = cli.Path;
             request.PlanOnly = JiraPreferences.AgentPlanOnly;
-            request.AllowedTools = ResolveAllowedTools();
+            request.AllowedTools = ResolveAllowedTools(aiJira);
 
             if (string.IsNullOrWhiteSpace(request.WorkingDirectory))
                 request.WorkingDirectory = await ResolveWorkingDirectoryAsync();
@@ -239,9 +244,18 @@ namespace OxenteGames.JiraCommunication.Agents
 
                 IAgentRunner runner = CreateRunner(request.Provider);
                 string commandLine = runner.BuildCommandLine(request);
+
+                List<AgentEnvVariable> environment = AgentEnvFile.Load();
+
+                // Only when the env file is in play at all: a developer who turned
+                // exporting off did so to keep this package out of the run's
+                // environment, and ai-jira's variables are still this package's doing.
+                if (environment.Count > 0)
+                    AiJiraLocator.AppendVariables(environment, aiJira);
+
                 AgentRunStore.WriteScript(paths,
                     AgentScript.Build(paths, request.WorkingDirectory, commandLine,
-                        AgentEnvFile.Load(), request.PlanOnly));
+                        environment, request.PlanOnly));
             }
             catch (Exception exception)
             {
@@ -349,7 +363,7 @@ namespace OxenteGames.JiraCommunication.Agents
         /// what the package pre-approves.
         /// </para>
         /// </remarks>
-        private static string ResolveAllowedTools()
+        private static string ResolveAllowedTools(AiJiraInfo aiJira)
         {
             var patterns = new List<string>
             {
@@ -383,7 +397,49 @@ namespace OxenteGames.JiraCommunication.Agents
                 "Bash(git switch -c:*)"
             };
 
+            AppendAiJiraTools(patterns, aiJira);
+
             return string.Join(",", patterns.ToArray());
+        }
+
+        /// <summary>
+        /// Pre-approves the ai-jira commands, but only on a machine that has them.
+        /// </summary>
+        /// <remarks>
+        /// Gated on the probe rather than added unconditionally. These patterns
+        /// authorize a PowerShell host and the GitHub CLI, which is a wider grant than
+        /// anything else on the list, and there is no reason to hand it to a run on a
+        /// machine where the scripts it would run do not exist.
+        /// <para>
+        /// The skills are named as well as the scripts. A skill invocation and the
+        /// command it ends up running are matched separately by the CLI, so approving
+        /// only one of the two leaves the run blocked halfway through — after the
+        /// agent has already told the developer it is creating the card.
+        /// </para>
+        /// </remarks>
+        private static void AppendAiJiraTools(List<string> patterns, AiJiraInfo aiJira)
+        {
+            if (!aiJira.Found)
+                return;
+
+            foreach (string command in AiJiraLocator.KnownCommands)
+                patterns.Add("Skill(" + command + ")");
+
+            // Both hosts and both call shapes: the skills invoke the scripts by an
+            // absolute path built from JIRA_CLI_HOME, and a developer reading the
+            // transcript may retry one by name.
+            // Scoped to ai-jira's own script names. A blanket "pwsh -File *" would
+            // also match every other PowerShell file on the machine, which is a much
+            // wider grant than anything this list has ever handed out.
+            patterns.Add("Bash(pwsh *jira-*.ps1*)");
+            patterns.Add("Bash(powershell *jira-*.ps1*)");
+
+            if (aiJira.HasGh)
+            {
+                patterns.Add("Bash(gh pr:*)");
+                patterns.Add("Bash(gh repo view:*)");
+                patterns.Add("Bash(gh auth status:*)");
+            }
         }
 
         /// <summary>

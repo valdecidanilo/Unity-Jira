@@ -39,6 +39,12 @@ namespace OxenteGames.JiraCommunication.UI
         /// <summary>How often the quota countdown is refreshed, in milliseconds.</summary>
         private const long UsageRefreshMs = 30_000;
 
+        /// <summary>Frame interval of the working indicator, in milliseconds.</summary>
+        private const long TypingFrameMs = 110;
+
+        /// <summary>Frames one dot is held for, so the ellipsis reads as a pulse.</summary>
+        private const int TypingFramesPerDot = 4;
+
         private readonly Action _repaint;
 
         /// <summary>Opens the settings tab, where the agent is configured.</summary>
@@ -66,6 +72,16 @@ namespace OxenteGames.JiraCommunication.UI
         private Button _sendButton;
         private Button _cancelButton;
         private Label _status;
+
+        private VisualElement _typingRow;
+        private VisualElement _typingSpinner;
+        private Label _typingLabel;
+        private IVisualElementScheduledItem _typingAnimation;
+        private int _typingFrame;
+        private bool _typingVisible;
+
+        /// <summary>Last thing the running turn reported doing, shown while it works.</summary>
+        private string _typingDetail = string.Empty;
 
         private readonly List<TurnView> _turns = new List<TurnView>();
 
@@ -126,6 +142,7 @@ namespace OxenteGames.JiraCommunication.UI
             _root.Add(BuildToolbar());
             _root.Add(BuildHistoryPanel());
             _root.Add(BuildChat());
+            _root.Add(BuildTypingRow());
             _root.Add(BuildComposer());
 
             Subscribe();
@@ -146,6 +163,12 @@ namespace OxenteGames.JiraCommunication.UI
         public void Dispose()
         {
             Unsubscribe();
+
+            if (_typingAnimation != null)
+                _typingAnimation.Pause();
+
+            _typingAnimation = null;
+            _typingRow = null;
             _root = null;
         }
 
@@ -499,6 +522,110 @@ namespace OxenteGames.JiraCommunication.UI
             return _chat;
         }
 
+        // --- Working indicator -----------------------------------------------
+
+        /// <summary>
+        /// The "still working" row shown between the transcript and the composer.
+        /// </summary>
+        /// <remarks>
+        /// A turn can spend a long stretch producing nothing the transcript shows —
+        /// reading files, thinking — and a chat that has gone completely still is
+        /// indistinguishable from one that has died. A disabled send button is not
+        /// enough of a signal, because it does not move.
+        /// <para>
+        /// It deliberately lives outside the <see cref="ScrollView"/>. Inside it, the
+        /// row would be pushed off-screen by the very output it is reporting on, and
+        /// <see cref="RenderThread"/> — which clears the scroll view — would delete it
+        /// on every thread switch.
+        /// </para>
+        /// </remarks>
+        private VisualElement BuildTypingRow()
+        {
+            _typingRow = new VisualElement();
+            JiraStyles.ApplyLoaderRow(_typingRow);
+            _typingRow.style.marginTop = 6;
+            _typingRow.style.display = DisplayStyle.None;
+
+            _typingSpinner = new VisualElement();
+            JiraStyles.ApplyLoaderSpinner(_typingSpinner);
+            _typingRow.Add(_typingSpinner);
+
+            _typingLabel = new Label(L.Tr(L.K.AgentWorking));
+            JiraStyles.ApplyMuted(_typingLabel);
+            _typingLabel.style.marginLeft = 10;
+            _typingLabel.style.flexShrink = 1;
+            _typingLabel.style.overflow = Overflow.Hidden;
+            _typingRow.Add(_typingLabel);
+
+            // Created paused: the panel is usually opened on an idle conversation, and
+            // a scheduled item that ticks ten times a second forces a repaint each
+            // time whether or not anything is running.
+            _typingAnimation = _typingRow.schedule.Execute(AnimateTyping).Every(TypingFrameMs);
+            _typingAnimation.Pause();
+
+            return _typingRow;
+        }
+
+        /// <summary>Shows or hides the indicator, and starts or stops its animation.</summary>
+        private void UpdateTypingState(bool busy)
+        {
+            if (_typingRow == null || _typingAnimation == null)
+                return;
+
+            if (_typingVisible == busy)
+                return;
+
+            _typingVisible = busy;
+            _typingRow.style.display = busy ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (busy)
+            {
+                _typingFrame = 0;
+                _typingAnimation.Resume();
+            }
+            else
+            {
+                _typingDetail = string.Empty;
+                _typingAnimation.Pause();
+            }
+        }
+
+        /// <summary>
+        /// Advances one frame of the indicator: the spinner, the pulsing ellipsis, and
+        /// the send button's label, which is the same state seen from the other side.
+        /// </summary>
+        private void AnimateTyping()
+        {
+            if (_typingRow == null || _typingRow.panel == null)
+                return;
+
+            _typingFrame++;
+
+            // Unity ships a twelve-frame spinner as editor icons; using it keeps this
+            // looking like the rest of the Editor instead of a hand-rolled widget.
+            var frame = EditorGUIUtility
+                .IconContent("WaitSpin" + (_typingFrame % 12).ToString("00", CultureInfo.InvariantCulture))
+                ?.image as Texture2D;
+
+            if (frame != null && _typingSpinner != null)
+                _typingSpinner.style.backgroundImage = new StyleBackground(frame);
+
+            string dots = new string('.', 1 + _typingFrame / TypingFramesPerDot % 3);
+            string working = L.Tr(L.K.AgentWorking) + dots;
+
+            if (_typingLabel != null)
+            {
+                _typingLabel.text = string.IsNullOrWhiteSpace(_typingDetail)
+                    ? working
+                    : working + "  ·  " + _typingDetail;
+            }
+
+            if (_sendButton != null)
+                _sendButton.text = working;
+
+            _repaint?.Invoke();
+        }
+
         private void SelectMostRelevantThread()
         {
             List<AgentRunInfo> threads = AgentService.Threads();
@@ -707,7 +834,10 @@ namespace OxenteGames.JiraCommunication.UI
 
             // Keep the newest line in view while a turn is live.
             if (run.IsRunning)
+            {
+                _typingDetail = turn.LastStep;
                 ScrollToEnd();
+            }
         }
 
         /// <summary>One line of the collapsed step log, or null for events it hides.</summary>
@@ -993,9 +1123,17 @@ namespace OxenteGames.JiraCommunication.UI
             bool busy = AgentService.IsThreadBusy(_threadId);
 
             _sendButton.SetEnabled(_cliReady && !busy);
-            _sendButton.text = busy ? L.Tr(L.K.BtnAgentRunning) : L.Tr(L.K.BtnAgentSend);
+
+            // While busy the label is driven by the animation; this only covers the
+            // frames before its first tick.
+            if (!busy)
+                _sendButton.text = L.Tr(L.K.BtnAgentSend);
+            else if (!_sendButton.text.StartsWith(L.Tr(L.K.AgentWorking), StringComparison.Ordinal))
+                _sendButton.text = L.Tr(L.K.BtnAgentRunning);
 
             _cancelButton.style.display = busy ? DisplayStyle.Flex : DisplayStyle.None;
+
+            UpdateTypingState(busy);
         }
 
         private void SetStatus(string message, bool success)
@@ -1090,6 +1228,60 @@ namespace OxenteGames.JiraCommunication.UI
             }
 
             _composer.value = string.Empty;
+            SetStatus(string.Empty, true);
+            await LaunchAsync(request);
+        }
+
+        /// <summary>
+        /// Hands one ai-jira command to the agent as a new conversation.
+        /// </summary>
+        /// <remarks>
+        /// A new thread rather than a follow-up, and not for tidiness: resuming would
+        /// drop the routing prompt into a session already holding an unrelated task,
+        /// where the previous turn's context competes with the skill's instructions.
+        /// These commands are short and self-contained; a clean session is the cheap
+        /// option here, not the expensive one.
+        /// <para>
+        /// Whatever is in the composer rides along as extra context. Someone who typed
+        /// "só o que mexi em Player.cs" and then pressed the card button meant the two
+        /// together, and silently discarding it would look like the button ignored them.
+        /// </para>
+        /// </remarks>
+        public async void RunAiJiraCommand(string command)
+        {
+            if (string.IsNullOrWhiteSpace(command))
+                return;
+
+            if (AgentService.IsThreadBusy(_threadId))
+            {
+                SetStatus(L.Tr(L.K.MsgAgentBusy), false);
+                return;
+            }
+
+            string extra = (_composer?.value ?? string.Empty).Trim();
+
+            StartNewThread();
+
+            if (string.IsNullOrWhiteSpace(_workingDirectory))
+                await ResolveWorkingDirectoryAsync();
+
+            var request = new AgentRequest
+            {
+                Provider = Provider,
+                WorkingDirectory = _workingDirectory,
+                Instruction = string.IsNullOrWhiteSpace(extra)
+                    ? AiJiraPrompt.Title(command)
+                    : AiJiraPrompt.Title(command) + "\n" + extra,
+                Prompt = AiJiraPrompt.Build(command, extra, IsPortuguese),
+                ThreadId = string.Empty,
+                Title = AiJiraPrompt.Title(command),
+                PermissionMode = JiraPreferences.AgentPermission,
+                Model = AgentModelCatalog.Sanitize(Provider, JiraPreferences.GetAgentModel(Provider))
+            };
+
+            if (_composer != null)
+                _composer.value = string.Empty;
+
             SetStatus(string.Empty, true);
             await LaunchAsync(request);
         }

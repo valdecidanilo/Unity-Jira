@@ -1067,6 +1067,83 @@ namespace OxenteGames.JiraCommunication.Localization
                 "O e-mail aqui ({0}) não é o da conexão da janela ({1}). O token pertence a uma conta só: com o e-mail errado o Jira responde 401, que parece token inválido e não é.",
                 "The e-mail here ({0}) is not the one the window connected with ({1}). A token belongs to one account: with the wrong e-mail Jira answers 401, which looks like an invalid token and is not."
             },
+
+            [K.AgentWorking] = new[] { "Executando", "Running" },
+
+            // --- ai-jira ---
+
+            [K.TabAiJira] = new[] { "ai-jira", "ai-jira" },
+            [K.AiJiraChecking] = new[] { "Procurando o ai-jira nesta máquina...", "Looking for ai-jira on this machine..." },
+            [K.AiJiraChipFound] = new[] { "Instalado", "Installed" },
+            [K.AiJiraChipMissing] = new[] { "Não encontrado", "Not found" },
+            [K.AiJiraIntro] = new[]
+            {
+                "O ai-jira traz um comando por etapa do fluxo: criar o card a partir do que mudou, cuidar do pull request e mover os cards conforme os PRs. "
+                + "Cada botão abre uma conversa na aba Agente, que executa a skill correspondente.",
+                "ai-jira brings one command per step of the flow: create the card from what changed, handle the pull request, and move cards to match the PRs. "
+                + "Each button opens a conversation on the Agent tab, which runs the matching skill."
+            },
+            [K.AiJiraMissingText] = new[]
+            {
+                "O ai-jira não está instalado aqui, ou o clone não está onde o instalador o deixa. Ele é um conjunto de scripts PowerShell instalado por máquina, fora do projeto Unity.",
+                "ai-jira is not installed here, or the clone is not where the installer leaves it. It is a set of PowerShell scripts installed per machine, outside the Unity project."
+            },
+            [K.AiJiraHomeLabel] = new[] { "Instalação:", "Install:" },
+            [K.AiJiraCommandsTitle] = new[] { "Comandos", "Commands" },
+            [K.AiJiraDispatchHint] = new[]
+            {
+                "O comando vai para a aba Agente como uma conversa nova. Se a skill precisar de uma escolha — épico, tipo, time, prioridade — o agente pergunta no chat e você responde ali.",
+                "The command goes to the Agent tab as a new conversation. If the skill needs a choice — epic, type, team, priority — the agent asks in the chat and you answer there."
+            },
+            [K.AiJiraCommandMissing] = new[]
+            {
+                "Não existe nesta instalação. Atualize o clone do ai-jira.",
+                "Not present in this install. Update the ai-jira clone."
+            },
+            [K.AiJiraPowerShellMissing] = new[]
+            {
+                "Nem pwsh nem powershell responderam no PATH. Os scripts do ai-jira são PowerShell, então nenhum comando roda assim.",
+                "Neither pwsh nor powershell answered on PATH. ai-jira's scripts are PowerShell, so no command can run like this."
+            },
+            [K.AiJiraGhMissing] = new[]
+            {
+                "O GitHub CLI (gh) não está no PATH. O jira-pr fala com o GitHub por ele, e sem isso não abre nem atualiza pull request.",
+                "The GitHub CLI (gh) is not on PATH. jira-pr talks to GitHub through it, and without it no pull request is opened or updated."
+            },
+            [K.AiJiraSkillsMissing] = new[]
+            {
+                "As skills do ai-jira não estão registradas para o {0}. Os scripts estão aqui, mas o agente não conhece os comandos pelo nome — rode o install.ps1 do ai-jira de novo.",
+                "ai-jira's skills are not registered for {0}. The scripts are here, but the agent does not know the commands by name — run ai-jira's install.ps1 again."
+            },
+            [K.AiJiraInitDesc] = new[]
+            {
+                "Lê a instância do Jira e gera o config.json do ai-jira com projetos, campos e status reais. Uma vez por máquina.",
+                "Reads the Jira instance and generates ai-jira's config.json with the real projects, fields and statuses. Once per machine."
+            },
+            [K.AiJiraCardDesc] = new[]
+            {
+                "Lê o diff e escreve o card pelo que a mudança faz, pergunta épico, tipo, time e prioridade, cria e faz checkout do branch.",
+                "Reads the diff and writes the card from what the change does, asks for epic, type, team and priority, creates it and checks out the branch."
+            },
+            [K.AiJiraPrDesc] = new[]
+            {
+                "Abre ou faz merge do pull request pelo GitHub CLI, com o título do card, e sincroniza o status depois.",
+                "Opens or merges the pull request through the GitHub CLI, with the card's title, and syncs the status afterwards."
+            },
+            [K.AiJiraSyncDesc] = new[]
+            {
+                "Move os cards pelo estado real dos pull requests — em review quando abre, concluído quando faz merge.",
+                "Moves the cards by the pull requests' real state — in review when opened, done when merged."
+            },
+            [K.BtnAiJiraInit] = new[] { "Configurar nesta máquina", "Set up on this machine" },
+            [K.BtnAiJiraCard] = new[] { "Criar card do que mudou", "Create card from the change" },
+            [K.BtnAiJiraPr] = new[] { "Cuidar do pull request", "Handle the pull request" },
+            [K.BtnAiJiraSync] = new[] { "Sincronizar cards com os PRs", "Sync cards with the PRs" },
+            [K.BtnAiJiraRecheck] = new[] { "Procurar de novo", "Check again" },
+            [K.BtnAiJiraOpenRepo] = new[] { "Abrir o repositório", "Open the repository" },
+            [K.BtnAiJiraCopyDiagnostics] = new[] { "Copiar diagnóstico", "Copy diagnostics" },
+            [K.MsgAiJiraCopied] = new[] { "Diagnóstico copiado.", "Diagnostics copied." },
+            [K.MsgAiJiraDispatched] = new[] { "{0} enviado para a aba Agente.", "{0} sent to the Agent tab." },
         };
 
         internal static class K
@@ -1507,6 +1584,36 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string AgentPlanOnlyLabel = "AgentPlanOnlyLabel";
             public const string AgentPlanOnlyHint = "AgentPlanOnlyHint";
             public const string AgentCostMeaningNote = "AgentCostMeaningNote";
+            public const string AgentWorking = "AgentWorking";
+
+            // --- ai-jira ---
+
+            public const string TabAiJira = "TabAiJira";
+            public const string AiJiraChecking = "AiJiraChecking";
+            public const string AiJiraChipFound = "AiJiraChipFound";
+            public const string AiJiraChipMissing = "AiJiraChipMissing";
+            public const string AiJiraIntro = "AiJiraIntro";
+            public const string AiJiraMissingText = "AiJiraMissingText";
+            public const string AiJiraHomeLabel = "AiJiraHomeLabel";
+            public const string AiJiraCommandsTitle = "AiJiraCommandsTitle";
+            public const string AiJiraDispatchHint = "AiJiraDispatchHint";
+            public const string AiJiraCommandMissing = "AiJiraCommandMissing";
+            public const string AiJiraPowerShellMissing = "AiJiraPowerShellMissing";
+            public const string AiJiraGhMissing = "AiJiraGhMissing";
+            public const string AiJiraSkillsMissing = "AiJiraSkillsMissing";
+            public const string AiJiraInitDesc = "AiJiraInitDesc";
+            public const string AiJiraCardDesc = "AiJiraCardDesc";
+            public const string AiJiraPrDesc = "AiJiraPrDesc";
+            public const string AiJiraSyncDesc = "AiJiraSyncDesc";
+            public const string BtnAiJiraInit = "BtnAiJiraInit";
+            public const string BtnAiJiraCard = "BtnAiJiraCard";
+            public const string BtnAiJiraPr = "BtnAiJiraPr";
+            public const string BtnAiJiraSync = "BtnAiJiraSync";
+            public const string BtnAiJiraRecheck = "BtnAiJiraRecheck";
+            public const string BtnAiJiraOpenRepo = "BtnAiJiraOpenRepo";
+            public const string BtnAiJiraCopyDiagnostics = "BtnAiJiraCopyDiagnostics";
+            public const string MsgAiJiraCopied = "MsgAiJiraCopied";
+            public const string MsgAiJiraDispatched = "MsgAiJiraDispatched";
         }
     }
 }
