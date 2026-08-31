@@ -1072,43 +1072,12 @@ namespace OxenteGames.JiraCommunication.Localization
 
             // --- ai-jira ---
 
-            [K.TabAiJira] = new[] { "ai-jira", "ai-jira" },
+            [K.AiJiraSectionTitle] = new[] { "ai-jira", "ai-jira" },
             [K.AiJiraChecking] = new[] { "Procurando o ai-jira nesta máquina...", "Looking for ai-jira on this machine..." },
-            [K.AiJiraChipFound] = new[] { "Instalado", "Installed" },
-            [K.AiJiraChipMissing] = new[] { "Não encontrado", "Not found" },
-            [K.AiJiraIntro] = new[]
+            [K.AiJiraCommandsPending] = new[]
             {
-                "O ai-jira traz um comando por etapa do fluxo: criar o card a partir do que mudou, cuidar do pull request e mover os cards conforme os PRs. "
-                + "Cada botão abre uma conversa na aba Agente, que executa a skill correspondente.",
-                "ai-jira brings one command per step of the flow: create the card from what changed, handle the pull request, and move cards to match the PRs. "
-                + "Each button opens a conversation on the Agent tab, which runs the matching skill."
-            },
-            [K.AiJiraMissingText] = new[]
-            {
-                "O ai-jira não está instalado aqui, ou o clone não está onde o instalador o deixa. Ele é um conjunto de scripts PowerShell instalado por máquina, fora do projeto Unity.",
-                "ai-jira is not installed here, or the clone is not where the installer leaves it. It is a set of PowerShell scripts installed per machine, outside the Unity project."
-            },
-            [K.AiJiraHomeLabel] = new[] { "Instalação:", "Install:" },
-            [K.AiJiraCommandsTitle] = new[] { "Comandos", "Commands" },
-            [K.AiJiraDispatchHint] = new[]
-            {
-                "O comando vai para a aba Agente como uma conversa nova. Se a skill precisar de uma escolha — épico, tipo, time, prioridade — o agente pergunta no chat e você responde ali.",
-                "The command goes to the Agent tab as a new conversation. If the skill needs a choice — epic, type, team, priority — the agent asks in the chat and you answer there."
-            },
-            [K.AiJiraCommandMissing] = new[]
-            {
-                "Não existe nesta instalação. Atualize o clone do ai-jira.",
-                "Not present in this install. Update the ai-jira clone."
-            },
-            [K.AiJiraPowerShellMissing] = new[]
-            {
-                "Nem pwsh nem powershell responderam no PATH. Os scripts do ai-jira são PowerShell, então nenhum comando roda assim.",
-                "Neither pwsh nor powershell answered on PATH. ai-jira's scripts are PowerShell, so no command can run like this."
-            },
-            [K.AiJiraGhMissing] = new[]
-            {
-                "O GitHub CLI (gh) não está no PATH. O jira-pr fala com o GitHub por ele, e sem isso não abre nem atualiza pull request.",
-                "The GitHub CLI (gh) is not on PATH. jira-pr talks to GitHub through it, and without it no pull request is opened or updated."
+                "Ainda não dá para usar: resolva as linhas marcadas acima primeiro.",
+                "Not usable yet: clear the marked rows above first."
             },
             [K.AiJiraSkillsMissing] = new[]
             {
@@ -1143,7 +1112,107 @@ namespace OxenteGames.JiraCommunication.Localization
             [K.BtnAiJiraOpenRepo] = new[] { "Abrir o repositório", "Open the repository" },
             [K.BtnAiJiraCopyDiagnostics] = new[] { "Copiar diagnóstico", "Copy diagnostics" },
             [K.MsgAiJiraCopied] = new[] { "Diagnóstico copiado.", "Diagnostics copied." },
-            [K.MsgAiJiraDispatched] = new[] { "{0} enviado para a aba Agente.", "{0} sent to the Agent tab." },
+
+            [K.AiJiraChipReady] = new[] { "Pronto", "Ready" },
+            [K.AiJiraChipIncomplete] = new[] { "Incompleto", "Incomplete" },
+
+            [K.AiJiraCheckInstall] = new[] { "Instalação", "Install" },
+            [K.AiJiraCheckInstallMissing] = new[]
+            {
+                "não encontrado — use o botão Instalar abaixo",
+                "not found — use the Install button below"
+            },
+            [K.AiJiraCheckPowerShell] = new[] { "PowerShell", "PowerShell" },
+            [K.AiJiraCheckPowerShellMissing] = new[]
+            {
+                "nem pwsh nem powershell responderam no PATH; os scripts do ai-jira são PowerShell",
+                "neither pwsh nor powershell answered on PATH; ai-jira's scripts are PowerShell"
+            },
+            [K.AiJiraCheckCredentials] = new[] { "Credenciais", "Credentials" },
+            [K.AiJiraCheckCredentialsOk] = new[]
+            {
+                "JIRA_BASE_URL, JIRA_EMAIL e JIRA_API_TOKEN definidas",
+                "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN are set"
+            },
+            [K.AiJiraCheckCredentialsMissing] = new[]
+            {
+                "faltando — o ai-jira lê JIRA_BASE_URL, e não o JIRA_URL desta janela. Rode /jira-init no chat: ele imprime os comandos setx exatos, que você executa num terminal seu (o token nunca passa pelo agente).",
+                "missing — ai-jira reads JIRA_BASE_URL, not this window's JIRA_URL. Run /jira-init in the chat: it prints the exact setx commands for you to run in your own terminal (the token never passes through the agent)."
+            },
+            [K.AiJiraCheckConfig] = new[] { "config.json", "config.json" },
+            [K.AiJiraCheckConfigMissing] = new[]
+            {
+                "não gerado — rode /jira-init no chat; todo comando menos ele lê os projetos, campos e status daqui",
+                "not generated — run /jira-init in the chat; every command but that one reads projects, fields and statuses from it"
+            },
+            [K.AiJiraCheckGh] = new[] { "GitHub CLI", "GitHub CLI" },
+            [K.AiJiraCheckGhMissing] = new[]
+            {
+                "opcional — só o /jira-pr precisa dele. Instale com: winget install --id GitHub.cli",
+                "optional — only /jira-pr needs it. Install with: winget install --id GitHub.cli"
+            },
+
+            [K.AiJiraInstallTitle] = new[] { "Instalar o ai-jira", "Install ai-jira" },
+            [K.AiJiraUpdateTitle] = new[] { "Atualizar o ai-jira", "Update ai-jira" },
+            [K.AiJiraInstallExplain] = new[]
+            {
+                "Isto executa um script de outro repositório na sua máquina. Leia o comando antes de confirmar — ele é reproduzível à mão, se você preferir rodar no seu terminal.",
+                "This runs a script from another repository on your machine. Read the command before confirming — it is reproducible by hand, if you would rather run it in your own terminal."
+            },
+            [K.AiJiraInstallRunning] = new[] { "Executando...", "Running..." },
+            [K.AiJiraInstallWindowsOnly] = new[]
+            {
+                "O ai-jira é PowerShell e só instala no Windows.",
+                "ai-jira is PowerShell and only installs on Windows."
+            },
+            [K.AiJiraInstallNeedsGit] = new[]
+            {
+                "O git não está no PATH, e a instalação é um clone.",
+                "git is not on PATH, and installing means cloning."
+            },
+            [K.AiJiraInstallBlocked] = new[]
+            {
+                "Não dá para instalar a partir daqui nesta máquina.",
+                "Cannot install from here on this machine."
+            },
+            [K.BtnAiJiraInstall] = new[] { "Instalar", "Install" },
+            [K.BtnAiJiraUpdate] = new[] { "Atualizar", "Update" },
+            [K.BtnAiJiraInstallConfirm] = new[] { "Confirmar e executar", "Confirm and run" },
+            [K.BtnAiJiraInstallCancel] = new[] { "Cancelar", "Cancel" },
+            [K.BtnAiJiraOpenChat] = new[] { "Abrir o chat do agente", "Open the agent chat" },
+            [K.MsgAiJiraInstallOk] = new[]
+            {
+                "Instalação concluída. Abra um terminal novo para as variáveis valerem nele também.",
+                "Install finished. Open a new terminal for the variables to apply there too."
+            },
+            [K.MsgAiJiraInstallFailed] = new[] { "Falhou: {0} — veja o log abaixo.", "Failed: {0} — see the log below." },
+
+            [K.AgentSlashHint] = new[] { "Comandos do ai-jira:  {0}", "ai-jira commands:  {0}" },
+            [K.MsgAiJiraNotReady] = new[]
+            {
+                "O ai-jira ainda não está pronto. Veja o que falta em Configurações → ai-jira.",
+                "ai-jira is not ready yet. See what is missing under Settings → ai-jira."
+            },
+            [K.MsgAiJiraNeedsCredentials] = new[]
+            {
+                "Faltam as credenciais do ai-jira. Rode /jira-init: ele imprime os comandos setx exatos para você executar num terminal seu.",
+                "ai-jira's credentials are missing. Run /jira-init: it prints the exact setx commands for you to run in your own terminal."
+            },
+            [K.MsgAiJiraNeedsConfig] = new[]
+            {
+                "O config.json do ai-jira ainda não existe. Rode /jira-init primeiro.",
+                "ai-jira's config.json does not exist yet. Run /jira-init first."
+            },
+            [K.MsgAiJiraUnknownCommand] = new[]
+            {
+                "Comando desconhecido. Existem:  {0}",
+                "Unknown command. These exist:  {0}"
+            },
+            [K.MsgAiJiraNewThread] = new[]
+            {
+                "{0} abriu uma conversa nova — a anterior está no histórico.",
+                "{0} opened a new conversation — the previous one is in the history."
+            },
         };
 
         internal static class K
@@ -1588,18 +1657,11 @@ namespace OxenteGames.JiraCommunication.Localization
 
             // --- ai-jira ---
 
-            public const string TabAiJira = "TabAiJira";
+            public const string AiJiraSectionTitle = "AiJiraSectionTitle";
             public const string AiJiraChecking = "AiJiraChecking";
-            public const string AiJiraChipFound = "AiJiraChipFound";
             public const string AiJiraChipMissing = "AiJiraChipMissing";
             public const string AiJiraIntro = "AiJiraIntro";
-            public const string AiJiraMissingText = "AiJiraMissingText";
-            public const string AiJiraHomeLabel = "AiJiraHomeLabel";
             public const string AiJiraCommandsTitle = "AiJiraCommandsTitle";
-            public const string AiJiraDispatchHint = "AiJiraDispatchHint";
-            public const string AiJiraCommandMissing = "AiJiraCommandMissing";
-            public const string AiJiraPowerShellMissing = "AiJiraPowerShellMissing";
-            public const string AiJiraGhMissing = "AiJiraGhMissing";
             public const string AiJiraSkillsMissing = "AiJiraSkillsMissing";
             public const string AiJiraInitDesc = "AiJiraInitDesc";
             public const string AiJiraCardDesc = "AiJiraCardDesc";
@@ -1613,7 +1675,41 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string BtnAiJiraOpenRepo = "BtnAiJiraOpenRepo";
             public const string BtnAiJiraCopyDiagnostics = "BtnAiJiraCopyDiagnostics";
             public const string MsgAiJiraCopied = "MsgAiJiraCopied";
-            public const string MsgAiJiraDispatched = "MsgAiJiraDispatched";
+            public const string AiJiraCommandsHint = "AiJiraCommandsHint";
+            public const string AiJiraCommandsPending = "AiJiraCommandsPending";
+            public const string AiJiraChipReady = "AiJiraChipReady";
+            public const string AiJiraChipIncomplete = "AiJiraChipIncomplete";
+            public const string AiJiraCheckInstall = "AiJiraCheckInstall";
+            public const string AiJiraCheckInstallMissing = "AiJiraCheckInstallMissing";
+            public const string AiJiraCheckPowerShell = "AiJiraCheckPowerShell";
+            public const string AiJiraCheckPowerShellMissing = "AiJiraCheckPowerShellMissing";
+            public const string AiJiraCheckCredentials = "AiJiraCheckCredentials";
+            public const string AiJiraCheckCredentialsOk = "AiJiraCheckCredentialsOk";
+            public const string AiJiraCheckCredentialsMissing = "AiJiraCheckCredentialsMissing";
+            public const string AiJiraCheckConfig = "AiJiraCheckConfig";
+            public const string AiJiraCheckConfigMissing = "AiJiraCheckConfigMissing";
+            public const string AiJiraCheckGh = "AiJiraCheckGh";
+            public const string AiJiraCheckGhMissing = "AiJiraCheckGhMissing";
+            public const string AiJiraInstallTitle = "AiJiraInstallTitle";
+            public const string AiJiraUpdateTitle = "AiJiraUpdateTitle";
+            public const string AiJiraInstallExplain = "AiJiraInstallExplain";
+            public const string AiJiraInstallRunning = "AiJiraInstallRunning";
+            public const string AiJiraInstallWindowsOnly = "AiJiraInstallWindowsOnly";
+            public const string AiJiraInstallNeedsGit = "AiJiraInstallNeedsGit";
+            public const string AiJiraInstallBlocked = "AiJiraInstallBlocked";
+            public const string BtnAiJiraInstall = "BtnAiJiraInstall";
+            public const string BtnAiJiraUpdate = "BtnAiJiraUpdate";
+            public const string BtnAiJiraInstallConfirm = "BtnAiJiraInstallConfirm";
+            public const string BtnAiJiraInstallCancel = "BtnAiJiraInstallCancel";
+            public const string BtnAiJiraOpenChat = "BtnAiJiraOpenChat";
+            public const string MsgAiJiraInstallOk = "MsgAiJiraInstallOk";
+            public const string MsgAiJiraInstallFailed = "MsgAiJiraInstallFailed";
+            public const string AgentSlashHint = "AgentSlashHint";
+            public const string MsgAiJiraNotReady = "MsgAiJiraNotReady";
+            public const string MsgAiJiraNeedsCredentials = "MsgAiJiraNeedsCredentials";
+            public const string MsgAiJiraNeedsConfig = "MsgAiJiraNeedsConfig";
+            public const string MsgAiJiraUnknownCommand = "MsgAiJiraUnknownCommand";
+            public const string MsgAiJiraNewThread = "MsgAiJiraNewThread";
         }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace OxenteGames.JiraCommunication.Agents
@@ -100,6 +101,83 @@ namespace OxenteGames.JiraCommunication.Agents
         public static string Title(string command)
         {
             return string.IsNullOrWhiteSpace(command) ? "ai-jira" : command;
+        }
+
+        /// <summary>
+        /// Reads a <c>/jira-card ...</c> line typed into the chat composer.
+        /// </summary>
+        /// <remarks>
+        /// The slash exists because that is how these commands are spelled everywhere
+        /// else — in the CLI, in the README, in the developer's head. It is not the
+        /// CLI's own slash syntax, though: a headless run has no interactive prompt to
+        /// receive one, so what a slash reaches here is a local rewrite into the same
+        /// routing prompt the panel builds. The developer never has to know that.
+        /// <para>
+        /// The <c>jira-</c> prefix is optional, so <c>/card</c> and <c>/jira-card</c>
+        /// both land. Anything else returns false and is reported rather than sent:
+        /// a mistyped command that silently becomes the first line of a prompt is a
+        /// turn spent watching the agent puzzle over it.
+        /// </para>
+        /// </remarks>
+        public static bool TryParseCommand(string text, out string command, out string rest)
+        {
+            command = string.Empty;
+            rest = string.Empty;
+
+            string trimmed = (text ?? string.Empty).TrimStart();
+            if (!trimmed.StartsWith("/", StringComparison.Ordinal))
+                return false;
+
+            trimmed = trimmed.Substring(1);
+
+            int split = trimmed.IndexOfAny(new[] { ' ', '\t', '\n', '\r' });
+            string name = split < 0 ? trimmed : trimmed.Substring(0, split);
+            rest = split < 0 ? string.Empty : trimmed.Substring(split).Trim();
+
+            name = name.Trim().ToLowerInvariant();
+            if (name.Length == 0)
+                return false;
+
+            if (!name.StartsWith("jira-", StringComparison.Ordinal))
+                name = "jira-" + name;
+
+            foreach (string known in AiJiraLocator.KnownCommands)
+            {
+                if (string.Equals(known, name, StringComparison.Ordinal))
+                {
+                    command = known;
+                    return true;
+                }
+            }
+
+            // Both outputs are cleared on the way out. A caller that reads `rest`
+            // after a false return gets nothing rather than the tail of a path that
+            // merely started with a slash.
+            rest = string.Empty;
+            return false;
+        }
+
+        /// <summary>True when the text looks like a slash command, valid or not.</summary>
+        public static bool LooksLikeCommand(string text)
+        {
+            string trimmed = (text ?? string.Empty).TrimStart();
+            return trimmed.Length > 1 && trimmed[0] == '/';
+        }
+
+        /// <summary>The commands as a single line, for the composer hint.</summary>
+        public static string CommandList()
+        {
+            var sb = new StringBuilder(96);
+
+            foreach (string command in AiJiraLocator.KnownCommands)
+            {
+                if (sb.Length > 0)
+                    sb.Append("  ");
+
+                sb.Append('/').Append(command);
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>

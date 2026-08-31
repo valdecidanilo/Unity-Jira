@@ -83,6 +83,16 @@ namespace OxenteGames.JiraCommunication.UI
         /// <summary>Last thing the running turn reported doing, shown while it works.</summary>
         private string _typingDetail = string.Empty;
 
+        private Label _slashHint;
+
+        /// <summary>
+        /// What the ai-jira probe found, for deciding per command whether a slash line
+        /// can run. Kept whole rather than reduced to a flag: the commands do not share
+        /// one readiness, and <c>jira-init</c> is precisely the one that runs when the
+        /// others cannot.
+        /// </summary>
+        private AiJiraInfo _aiJira;
+
         private readonly List<TurnView> _turns = new List<TurnView>();
 
         private string _threadId = string.Empty;
@@ -149,9 +159,10 @@ namespace OxenteGames.JiraCommunication.UI
             SelectMostRelevantThread();
             RefreshUsage();
 
-            // Both are async and independent; neither blocks the panel appearing.
+            // All three are async and independent; none blocks the panel appearing.
             _ = ProbeCliAsync(false);
             _ = ResolveWorkingDirectoryAsync();
+            _ = ProbeAiJiraAsync();
 
             // The reset time is a countdown, so it goes stale on its own even when
             // nothing happens in the Editor.
@@ -1071,6 +1082,13 @@ namespace OxenteGames.JiraCommunication.UI
             hint.style.marginTop = 4;
             container.Add(hint);
 
+            // Populated by the ai-jira probe; hidden on a machine without the install,
+            // where advertising commands that cannot run would be worse than silence.
+            _slashHint = new Label();
+            JiraStyles.ApplyNote(_slashHint);
+            _slashHint.style.display = DisplayStyle.None;
+            container.Add(_slashHint);
+
             _status = new Label();
             JiraStyles.ApplyInlineStatus(_status, true);
             container.Add(_status);
@@ -1161,6 +1179,33 @@ namespace OxenteGames.JiraCommunication.UI
             _repaint?.Invoke();
         }
 
+        /// <summary>
+        /// Decides whether the composer accepts <c>/jira-…</c>, and says so.
+        /// </summary>
+        /// <remarks>
+        /// The result is kept whole because readiness is per command. A machine with
+        /// the scripts but no <c>config.json</c> can run <c>jira-init</c> and nothing
+        /// else, and that is the state every fresh install starts in.
+        /// </remarks>
+        private async Task ProbeAiJiraAsync()
+        {
+            AiJiraInfo info = await AiJiraLocator.LocateAsync();
+
+            // The window may have been rebuilt while the probe was in flight.
+            if (_slashHint == null)
+                return;
+
+            _aiJira = info;
+
+            // Shown as soon as anything can run, not once everything can: on a fresh
+            // install /jira-init is the only usable command, and it is also the one the
+            // developer needs to find.
+            _slashHint.style.display = info.CanRunAnything ? DisplayStyle.Flex : DisplayStyle.None;
+            _slashHint.text = L.Tr(L.K.AgentSlashHint, AiJiraPrompt.CommandList());
+
+            _repaint?.Invoke();
+        }
+
         // --- Sending ---------------------------------------------------------
 
         /// <summary>
@@ -1184,6 +1229,9 @@ namespace OxenteGames.JiraCommunication.UI
                 SetStatus(L.Tr(L.K.MsgAgentBusy), false);
                 return;
             }
+
+            if (TryHandleSlashCommand(instruction))
+                return;
 
             AgentRunInfo resumable = AgentService.LastResumable(_threadId);
             bool canResume = resumable != null &&
@@ -1233,6 +1281,63 @@ namespace OxenteGames.JiraCommunication.UI
         }
 
         /// <summary>
+        /// Intercepts a <c>/jira-…</c> line, or lets an ordinary message through.
+        /// </summary>
+        /// <remarks>
+        /// Returns true only when the line was handled here — dispatched, or refused
+        /// with a reason on screen. A leading slash that names nothing we know is
+        /// refused rather than forwarded: sent on as a prompt it becomes a puzzle the
+        /// agent spends a turn on, and the developer pays for that turn.
+        /// <para>
+        /// A message that merely begins with a slash but is not a command at all — a
+        /// path, a regex — is only refused when ai-jira is installed here. Elsewhere
+        /// it is what it looks like: ordinary text.
+        /// </para>
+        /// </remarks>
+        private bool TryHandleSlashCommand(string instruction)
+        {
+            if (!AiJiraPrompt.LooksLikeCommand(instruction))
+                return false;
+
+            if (AiJiraPrompt.TryParseCommand(instruction, out string command, out string rest))
+            {
+                string blocked = _aiJira.BlockedReason(command);
+                if (!string.IsNullOrEmpty(blocked))
+                {
+                    SetStatus(BlockedText(command, blocked), false);
+                    return true;
+                }
+
+                if (_composer != null)
+                    _composer.value = string.Empty;
+
+                RunAiJiraCommand(command, rest);
+                return true;
+            }
+
+            // Without an install, a leading slash is just text — a path, a regex — and
+            // refusing it would break ordinary messages on most machines.
+            if (!_aiJira.CanRunAnything)
+                return false;
+
+            SetStatus(L.Tr(L.K.MsgAiJiraUnknownCommand, AiJiraPrompt.CommandList()), false);
+            return true;
+        }
+
+        /// <summary>Names the one missing piece, and the command that supplies it.</summary>
+        private static string BlockedText(string command, string reason)
+        {
+            switch (reason)
+            {
+                case "no-powershell": return L.Tr(L.K.AiJiraCheckPowerShellMissing);
+                case "no-credentials": return L.Tr(L.K.MsgAiJiraNeedsCredentials);
+                case "no-config": return L.Tr(L.K.MsgAiJiraNeedsConfig);
+                case "no-gh": return L.Tr(L.K.AiJiraCheckGhMissing);
+                default: return L.Tr(L.K.MsgAiJiraNotReady);
+            }
+        }
+
+        /// <summary>
         /// Hands one ai-jira command to the agent as a new conversation.
         /// </summary>
         /// <remarks>
@@ -1242,12 +1347,12 @@ namespace OxenteGames.JiraCommunication.UI
         /// These commands are short and self-contained; a clean session is the cheap
         /// option here, not the expensive one.
         /// <para>
-        /// Whatever is in the composer rides along as extra context. Someone who typed
-        /// "só o que mexi em Player.cs" and then pressed the card button meant the two
-        /// together, and silently discarding it would look like the button ignored them.
+        /// Anything typed after the command rides along as extra context. Someone who
+        /// wrote "/jira-card só o que mexi em Player.cs" meant the two together, and
+        /// discarding the tail would look like the command ignored them.
         /// </para>
         /// </remarks>
-        public async void RunAiJiraCommand(string command)
+        public async void RunAiJiraCommand(string command, string extra = null)
         {
             if (string.IsNullOrWhiteSpace(command))
                 return;
@@ -1258,8 +1363,9 @@ namespace OxenteGames.JiraCommunication.UI
                 return;
             }
 
-            string extra = (_composer?.value ?? string.Empty).Trim();
+            extra = (extra ?? _composer?.value ?? string.Empty).Trim();
 
+            bool continuing = AgentService.Thread(_threadId).Count > 0;
             StartNewThread();
 
             if (string.IsNullOrWhiteSpace(_workingDirectory))
@@ -1282,7 +1388,10 @@ namespace OxenteGames.JiraCommunication.UI
             if (_composer != null)
                 _composer.value = string.Empty;
 
-            SetStatus(string.Empty, true);
+            // Said out loud rather than done quietly: the transcript on screen was
+            // replaced, and someone who typed a command mid-conversation deserves to
+            // know their previous thread is in the history rather than lost.
+            SetStatus(continuing ? L.Tr(L.K.MsgAiJiraNewThread, command) : string.Empty, true);
             await LaunchAsync(request);
         }
 

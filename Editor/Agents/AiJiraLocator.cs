@@ -40,6 +40,20 @@ namespace OxenteGames.JiraCommunication.Agents
         /// <summary>Absolute path of the GitHub CLI, or empty. Only <c>jira-pr</c> needs it.</summary>
         public string GhPath;
 
+        /// <summary>Absolute path of git, or empty. Needed to install or update.</summary>
+        public string GitPath;
+
+        /// <summary>Path of the generated <c>config.json</c>, or empty when absent.</summary>
+        /// <remarks>
+        /// Its absence is the single most common reason a command fails on a machine
+        /// that is otherwise installed correctly: every command except <c>jira-init</c>
+        /// reads the project, field and status names from it.
+        /// </remarks>
+        public string ConfigPath;
+
+        /// <summary>True when all three variables ai-jira authenticates with are set.</summary>
+        public bool HasCredentials;
+
         /// <summary>Populated when <see cref="Found"/> is false.</summary>
         public string Error;
 
@@ -47,6 +61,62 @@ namespace OxenteGames.JiraCommunication.Agents
 
         public bool HasPowerShell => !string.IsNullOrWhiteSpace(PowerShellPath);
         public bool HasGh => !string.IsNullOrWhiteSpace(GhPath);
+        public bool HasGit => !string.IsNullOrWhiteSpace(GitPath);
+        public bool HasConfig => !string.IsNullOrWhiteSpace(ConfigPath);
+
+        /// <summary>True when the install is complete enough for every command to work.</summary>
+        public bool IsReady => Found && HasPowerShell && HasCredentials && HasConfig;
+
+        /// <summary>The scripts are here and something can run them.</summary>
+        public bool CanRunAnything => Found && HasPowerShell;
+
+        /// <summary>
+        /// Whether one specific command can run, which is not the same question as
+        /// <see cref="IsReady"/>.
+        /// </summary>
+        /// <remarks>
+        /// <c>jira-init</c> is the exception the whole method exists for: it is what
+        /// produces <c>config.json</c> and what prints the credential setup, so gating
+        /// it on either would refuse the one command that fixes them. Gating it that
+        /// way is a deadlock, not a safety check.
+        /// </remarks>
+        public bool CanRun(string command)
+        {
+            if (!CanRunAnything)
+                return false;
+
+            if (string.Equals(command, AiJiraLocator.CommandInit, StringComparison.Ordinal))
+                return true;
+
+            if (!HasCredentials || !HasConfig)
+                return false;
+
+            return !string.Equals(command, AiJiraLocator.CommandPr, StringComparison.Ordinal) || HasGh;
+        }
+
+        /// <summary>Why <see cref="CanRun"/> said no, as a key for the string table.</summary>
+        public string BlockedReason(string command)
+        {
+            if (!Found)
+                return "not-installed";
+
+            if (!HasPowerShell)
+                return "no-powershell";
+
+            if (string.Equals(command, AiJiraLocator.CommandInit, StringComparison.Ordinal))
+                return string.Empty;
+
+            if (!HasCredentials)
+                return "no-credentials";
+
+            if (!HasConfig)
+                return "no-config";
+
+            if (string.Equals(command, AiJiraLocator.CommandPr, StringComparison.Ordinal) && !HasGh)
+                return "no-gh";
+
+            return string.Empty;
+        }
 
         public AiJiraCommand Command(string name)
         {
@@ -77,6 +147,10 @@ namespace OxenteGames.JiraCommunication.Agents
                     sb.Append("powershell: ").AppendLine(PowerShellPath);
                 if (!string.IsNullOrWhiteSpace(GhPath))
                     sb.Append("gh: ").AppendLine(GhPath);
+                if (!string.IsNullOrWhiteSpace(GitPath))
+                    sb.Append("git: ").AppendLine(GitPath);
+                sb.Append("config.json: ").AppendLine(HasConfig ? ConfigPath : "missing");
+                sb.Append("credentials: ").AppendLine(HasCredentials ? "set" : "incomplete");
                 if (!string.IsNullOrWhiteSpace(Error))
                     sb.Append("error: ").AppendLine(Error);
 
@@ -201,24 +275,37 @@ namespace OxenteGames.JiraCommunication.Agents
             var trail = new List<string>();
             string home = ResolveHome(trail);
 
+            // Probed whether or not ai-jira is here. When it is missing these answer
+            // "can this machine install it at all"; when it is present they answer
+            // "can it actually run". Both are what the setup panel exists to say.
+            string powerShell = await ResolvePowerShellAsync(trail);
+            string git = await ResolveOnPathAsync("git");
+            trail.Add((string.IsNullOrWhiteSpace(git) ? "[miss] " : "[hit ] ") + "PATH: git");
+            string gh = await ResolveOnPathAsync("gh");
+            trail.Add((string.IsNullOrWhiteSpace(gh) ? "[miss] " : "[hit ] ") + "PATH: gh");
+
+            bool credentials = HasAllCredentials(trail);
+
             if (string.IsNullOrWhiteSpace(home))
             {
                 return new AiJiraInfo
                 {
                     Found = false,
                     Error = "not-installed",
+                    PowerShellPath = powerShell,
+                    GitPath = git,
+                    GhPath = gh,
+                    HasCredentials = credentials,
                     SearchedPaths = trail.ToArray()
                 };
             }
 
             AiJiraCommand[] commands = ResolveCommands(home, trail);
 
-            // The hosts are probed even when nothing will run right now: the tab has to
-            // be able to say "installed, but PowerShell did not answer" rather than
-            // offering a button that fails the moment it is pressed.
-            string powerShell = await ResolvePowerShellAsync(trail);
-            string gh = await ResolveOnPathAsync("gh");
-            trail.Add((string.IsNullOrWhiteSpace(gh) ? "[miss] " : "[hit ] ") + "PATH: gh");
+            string config = Path.Combine(home, "config.json");
+            bool hasConfig = SafeExists(config);
+            if (!hasConfig)
+                trail.Add("[miss] " + config);
 
             return new AiJiraInfo
             {
@@ -226,9 +313,59 @@ namespace OxenteGames.JiraCommunication.Agents
                 Home = home,
                 Commands = commands,
                 PowerShellPath = powerShell,
+                GitPath = git,
                 GhPath = gh,
+                ConfigPath = hasConfig ? config : string.Empty,
+                HasCredentials = credentials,
                 SearchedPaths = trail.ToArray()
             };
+        }
+
+        /// <summary>Variables ai-jira authenticates with. Deliberately never read here.</summary>
+        private static readonly string[] CredentialVariables =
+        {
+            "JIRA_BASE_URL",
+            "JIRA_EMAIL",
+            "JIRA_API_TOKEN"
+        };
+
+        /// <summary>
+        /// Whether all three credential variables are set, without touching a value.
+        /// </summary>
+        /// <remarks>
+        /// Only presence is tested, and only presence is recorded in the trail — a
+        /// diagnostics blob the developer is invited to paste elsewhere must never
+        /// carry an API token, and the surest way to guarantee that is for the value
+        /// to never be read.
+        /// </remarks>
+        private static bool HasAllCredentials(List<string> trail)
+        {
+            bool all = true;
+
+            foreach (string name in CredentialVariables)
+            {
+                bool set = !string.IsNullOrWhiteSpace(ReadEnvironment(name));
+                trail.Add((set ? "[hit ] " : "[miss] ") + "env: " + name);
+                all &= set;
+            }
+
+            return all;
+        }
+
+        /// <summary>Where the README tells people to clone it, for a fresh install.</summary>
+        public static string DefaultInstallPath()
+        {
+            try
+            {
+                string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                return string.IsNullOrWhiteSpace(profile)
+                    ? string.Empty
+                    : Path.Combine(profile, DefaultFolderName);
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
         }
 
         /// <summary>

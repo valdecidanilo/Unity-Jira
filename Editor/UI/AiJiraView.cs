@@ -10,43 +10,58 @@ using L = OxenteGames.JiraCommunication.Localization.JiraLoc;
 namespace OxenteGames.JiraCommunication.UI
 {
     /// <summary>
-    /// The ai-jira tab: the commands a local <c>ai-jira</c> install adds, and an
-    /// honest account of whether each one can actually run right now.
+    /// The ai-jira section of the settings tab: install it, and say exactly what is
+    /// still missing before its commands can work.
     /// </summary>
     /// <remarks>
-    /// The tab only exists on a machine that has ai-jira, so the panel spends its
-    /// space on the half that is not guaranteed: the PowerShell host, the GitHub CLI,
-    /// and whether <c>install.ps1</c> ever wired the skills into the agent CLI this
-    /// project is configured for. Each of those fails in a way that looks like the
-    /// agent misbehaving rather than a missing dependency, which is exactly the
-    /// confusion worth spending a card on.
+    /// Deliberately not a place to do work, which is why it is a settings card and not
+    /// a tab. The commands live in the agent chat, typed as <c>/jira-card</c> and
+    /// friends, because that is where the conversation they need already happens: these
+    /// skills stop and ask for an epic, a type, a team, and an answer to that belongs
+    /// in a chat, not in a panel that would have to grow a second one.
     /// <para>
-    /// Nothing here runs a script. Pressing a command hands it to the agent tab, which
-    /// already owns the conversation, the transcript, the quota meter and the cancel
-    /// button — and ai-jira's own skills are written to be driven by an agent, not
-    /// called as a library. A second execution path would be a second set of bugs for
-    /// no new capability.
+    /// So this card answers one question — can those commands run right now — and
+    /// gives the shortest path to yes. The checklist is the whole design: five things
+    /// are installed separately from each other, four of them can be absent
+    /// independently, and each absence produces a different failure that looks like the
+    /// agent misbehaving.
+    /// </para>
+    /// <para>
+    /// Installing runs someone else's script on the developer's machine, so it is a
+    /// two-click action: the first click shows the exact command line, the second runs
+    /// it. See <see cref="AiJiraInstaller"/>.
     /// </para>
     /// </remarks>
     internal sealed class AiJiraView
     {
+        private enum InstallState
+        {
+            Idle,
+            Confirming,
+            Running
+        }
+
         private readonly Action _repaint;
 
-        /// <summary>Hands one command over to the agent tab.</summary>
-        private readonly Action<string> _dispatch;
+        /// <summary>Switches to the agent tab, where the commands are typed.</summary>
+        private readonly Action _openAgent;
 
         private VisualElement _root;
         private VisualElement _statusCard;
+        private VisualElement _installCard;
         private VisualElement _commandsCard;
         private Label _status;
 
         private AiJiraInfo _info;
         private bool _probing;
 
-        public AiJiraView(Action repaint, Action<string> dispatch)
+        private InstallState _installState = InstallState.Idle;
+        private string _installLog = string.Empty;
+
+        public AiJiraView(Action repaint, Action openAgent)
         {
             _repaint = repaint;
-            _dispatch = dispatch;
+            _openAgent = openAgent;
         }
 
         private static string Provider => JiraPreferences.AgentProviderId;
@@ -58,6 +73,11 @@ namespace OxenteGames.JiraCommunication.UI
             _statusCard = new VisualElement();
             JiraStyles.ApplyCard(_statusCard);
             _root.Add(_statusCard);
+
+            _installCard = new VisualElement();
+            JiraStyles.ApplyCard(_installCard);
+            _installCard.style.display = DisplayStyle.None;
+            _root.Add(_installCard);
 
             _commandsCard = new VisualElement();
             JiraStyles.ApplyCard(_commandsCard);
@@ -73,25 +93,21 @@ namespace OxenteGames.JiraCommunication.UI
             return _root;
         }
 
-        /// <summary>Called when the tab becomes visible.</summary>
+        /// <summary>Called when the settings tab becomes visible.</summary>
         public void OnShow()
         {
-            // A cached result is enough here: an install appearing while the window is
-            // open is rare, and the explicit re-check button covers it. Re-probing on
-            // every tab switch would shell out for pwsh and gh each time.
-            if (AiJiraLocator.Cached.HasValue)
-                Render();
-            else
-                _ = RefreshAsync(false);
+            // Re-probed every time, unlike the CLI probe: this panel exists to be
+            // looked at right after the developer went and fixed one of the rows, and
+            // a cached "still missing" would make the fix look like it did nothing.
+            _ = RefreshAsync(true);
         }
 
         private async Task RefreshAsync(bool force)
         {
-            if (_probing)
+            if (_probing || _installState == InstallState.Running)
                 return;
 
             _probing = true;
-            RenderProbing();
 
             try
             {
@@ -116,9 +132,8 @@ namespace OxenteGames.JiraCommunication.UI
 
             _statusCard.Clear();
             _commandsCard.Clear();
-            _commandsCard.style.display = DisplayStyle.None;
 
-            var title = new Label("ai-jira");
+            var title = new Label(L.Tr(L.K.AiJiraSectionTitle));
             JiraStyles.ApplySectionTitle(title);
             _statusCard.Add(title);
 
@@ -136,12 +151,11 @@ namespace OxenteGames.JiraCommunication.UI
 
             _statusCard.Clear();
             _commandsCard.Clear();
+            _installCard.Clear();
 
             RenderStatusCard();
-
-            _commandsCard.style.display = _info.Found ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_info.Found)
-                RenderCommandsCard();
+            RenderInstallCard();
+            RenderCommandsCard();
 
             _repaint?.Invoke();
         }
@@ -155,75 +169,150 @@ namespace OxenteGames.JiraCommunication.UI
             header.style.alignItems = Align.Center;
             header.style.marginBottom = 8;
 
-            var title = new Label("ai-jira");
+            var title = new Label(L.Tr(L.K.AiJiraSectionTitle));
             JiraStyles.ApplySectionTitle(title);
             title.style.marginBottom = 0;
             title.style.flexGrow = 1;
             header.Add(title);
 
-            var chip = new Label(_info.Found
-                ? L.Tr(L.K.AiJiraChipFound)
-                : L.Tr(L.K.AiJiraChipMissing));
-            JiraStyles.ApplyChip(chip, _info.Found ? JiraTone.Success : JiraTone.Neutral);
+            var chip = new Label(ChipText());
+            JiraStyles.ApplyChip(chip, ChipTone());
             header.Add(chip);
 
             _statusCard.Add(header);
 
-            if (!_info.Found)
-            {
-                RenderMissing();
-                return;
-            }
-
             var intro = new Label(L.Tr(L.K.AiJiraIntro));
             JiraStyles.ApplyMuted(intro);
-            intro.style.marginBottom = 10;
+            intro.style.marginBottom = 12;
             _statusCard.Add(intro);
 
-            _statusCard.Add(Detail(L.Tr(L.K.AiJiraHomeLabel), _info.Home));
-
-            RenderRequirements();
+            RenderChecklist();
             RenderStatusButtons();
+        }
+
+        private string ChipText()
+        {
+            if (!_info.Found)
+                return L.Tr(L.K.AiJiraChipMissing);
+
+            return _info.IsReady ? L.Tr(L.K.AiJiraChipReady) : L.Tr(L.K.AiJiraChipIncomplete);
+        }
+
+        private JiraTone ChipTone()
+        {
+            if (!_info.Found)
+                return JiraTone.Neutral;
+
+            return _info.IsReady ? JiraTone.Success : JiraTone.Danger;
         }
 
         /// <summary>
-        /// The three things that are installed separately from the scripts.
+        /// The five things that have to line up, each with its own fix.
         /// </summary>
         /// <remarks>
-        /// Reported as warnings, not as errors that hide the commands. A missing
-        /// <c>gh</c> only stops <c>jira-pr</c>; missing skill pointers only stop the
-        /// agent from recognising the command by name. Blanking the whole tab for
-        /// either would hide the three commands that still work.
+        /// Ordered by dependency, not by importance: nothing below the install matters
+        /// until the install exists, and <c>config.json</c> cannot be generated before
+        /// the credentials resolve. A developer reading top to bottom hits their real
+        /// blocker first instead of chasing the last red row.
         /// </remarks>
-        private void RenderRequirements()
+        private void RenderChecklist()
         {
-            if (!_info.HasPowerShell)
-                _statusCard.Add(Warning(L.Tr(L.K.AiJiraPowerShellMissing)));
+            _statusCard.Add(Row(
+                _info.Found,
+                L.Tr(L.K.AiJiraCheckInstall),
+                _info.Found ? _info.Home : L.Tr(L.K.AiJiraCheckInstallMissing),
+                false));
 
-            if (!_info.HasGh)
-                _statusCard.Add(Warning(L.Tr(L.K.AiJiraGhMissing)));
+            _statusCard.Add(Row(
+                _info.HasPowerShell,
+                L.Tr(L.K.AiJiraCheckPowerShell),
+                _info.HasPowerShell ? _info.PowerShellPath : L.Tr(L.K.AiJiraCheckPowerShellMissing),
+                false));
 
-            if (!AiJiraLocator.SkillsWiredFor(Provider))
+            _statusCard.Add(Row(
+                _info.HasCredentials,
+                L.Tr(L.K.AiJiraCheckCredentials),
+                _info.HasCredentials
+                    ? L.Tr(L.K.AiJiraCheckCredentialsOk)
+                    : L.Tr(L.K.AiJiraCheckCredentialsMissing),
+                false));
+
+            _statusCard.Add(Row(
+                _info.HasConfig,
+                L.Tr(L.K.AiJiraCheckConfig),
+                _info.HasConfig ? _info.ConfigPath : L.Tr(L.K.AiJiraCheckConfigMissing),
+                false));
+
+            // Optional: only jira-pr needs it, so a red row here must not read like a
+            // broken install.
+            _statusCard.Add(Row(
+                _info.HasGh,
+                L.Tr(L.K.AiJiraCheckGh),
+                _info.HasGh ? _info.GhPath : L.Tr(L.K.AiJiraCheckGhMissing),
+                true));
+
+            if (_info.Found && !AiJiraLocator.SkillsWiredFor(Provider))
             {
-                _statusCard.Add(Warning(L.Tr(L.K.AiJiraSkillsMissing,
-                    AgentProvider.DisplayName(Provider))));
+                var warning = new Label(L.Tr(L.K.AiJiraSkillsMissing,
+                    AgentProvider.DisplayName(Provider)));
+                JiraStyles.ApplyNote(warning);
+                warning.style.marginTop = 8;
+                _statusCard.Add(warning);
             }
         }
 
-        private void RenderMissing()
+        private static VisualElement Row(bool ok, string label, string value, bool optional)
         {
-            var text = new Label(L.Tr(L.K.AiJiraMissingText));
-            JiraStyles.ApplyMuted(text);
-            text.style.marginBottom = 10;
-            _statusCard.Add(text);
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.FlexStart;
+            row.style.marginBottom = 6;
 
-            RenderStatusButtons();
+            // An optional item that is absent is neither a pass nor a failure, and a
+            // red cross beside "gh" would send people installing it to fix a card
+            // creation that never needed it.
+            var mark = new Label(ok ? "✓" : optional ? "–" : "✕");
+            mark.style.width = 18;
+            mark.style.minWidth = 18;
+            mark.style.unityFontStyleAndWeight = FontStyle.Bold;
+            mark.style.color = ok
+                ? new StyleColor(new Color32(87, 217, 163, 255))
+                : optional
+                    ? new StyleColor(new Color32(150, 158, 171, 255))
+                    : new StyleColor(new Color32(255, 118, 117, 255));
+            row.Add(mark);
+
+            var name = new Label(label);
+            name.style.width = 118;
+            name.style.minWidth = 118;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.style.fontSize = 11;
+            row.Add(name);
+
+            var text = new Label(value);
+            JiraStyles.ApplyMuted(text);
+            text.style.flexShrink = 1;
+            text.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(text);
+
+            return row;
         }
 
         private void RenderStatusButtons()
         {
             var row = new VisualElement();
             JiraStyles.ApplyButtonRow(row);
+            row.style.marginTop = 10;
+
+            string blocked = AiJiraInstaller.BlockedReason(_info);
+
+            var install = new Button(BeginInstall)
+            {
+                text = _info.Found ? L.Tr(L.K.BtnAiJiraUpdate) : L.Tr(L.K.BtnAiJiraInstall)
+            };
+            JiraStyles.ApplyPrimaryButton(install);
+            install.SetEnabled(string.IsNullOrEmpty(blocked) && _installState == InstallState.Idle);
+            row.Add(install);
 
             var recheck = new Button(() => _ = RefreshAsync(true))
             {
@@ -247,6 +336,25 @@ namespace OxenteGames.JiraCommunication.UI
             row.Add(diagnostics);
 
             _statusCard.Add(row);
+
+            if (!string.IsNullOrEmpty(blocked))
+            {
+                var reason = new Label(InstallBlockedText(blocked));
+                JiraStyles.ApplyNote(reason);
+                reason.style.marginTop = 6;
+                _statusCard.Add(reason);
+            }
+        }
+
+        private static string InstallBlockedText(string reason)
+        {
+            switch (reason)
+            {
+                case "windows-only": return L.Tr(L.K.AiJiraInstallWindowsOnly);
+                case "git-missing": return L.Tr(L.K.AiJiraInstallNeedsGit);
+                case "powershell-missing": return L.Tr(L.K.AiJiraCheckPowerShellMissing);
+                default: return L.Tr(L.K.AiJiraInstallBlocked);
+            }
         }
 
         private void CopyDiagnostics()
@@ -255,81 +363,168 @@ namespace OxenteGames.JiraCommunication.UI
             SetStatus(L.Tr(L.K.MsgAiJiraCopied), true);
         }
 
-        // --- Commands --------------------------------------------------------
+        // --- Install ----------------------------------------------------------
 
+        private void BeginInstall()
+        {
+            _installState = InstallState.Confirming;
+            _installLog = string.Empty;
+            Render();
+        }
+
+        /// <summary>
+        /// The confirmation step, the progress, and the log the run left behind.
+        /// </summary>
+        /// <remarks>
+        /// The command line is printed verbatim before the second click. Running a
+        /// script from another repository on the developer's machine is a thing they
+        /// should be able to read first — and to reproduce by hand afterwards, which
+        /// is what makes a failure diagnosable outside this window.
+        /// </remarks>
+        private void RenderInstallCard()
+        {
+            bool visible = _installState != InstallState.Idle || !string.IsNullOrEmpty(_installLog);
+            _installCard.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (!visible)
+                return;
+
+            var title = new Label(_info.Found
+                ? L.Tr(L.K.AiJiraUpdateTitle)
+                : L.Tr(L.K.AiJiraInstallTitle));
+            JiraStyles.ApplySectionTitle(title);
+            _installCard.Add(title);
+
+            if (_installState == InstallState.Confirming)
+            {
+                var explain = new Label(L.Tr(L.K.AiJiraInstallExplain));
+                JiraStyles.ApplyMuted(explain);
+                explain.style.marginBottom = 8;
+                _installCard.Add(explain);
+
+                var command = new Label(AiJiraInstaller.DescribeInstall(_info));
+                JiraStyles.ApplyResultBlock(command, false);
+                _installCard.Add(command);
+
+                var buttons = new VisualElement();
+                JiraStyles.ApplyButtonRow(buttons);
+                buttons.style.marginTop = 10;
+
+                var confirm = new Button(() => _ = RunInstallAsync())
+                {
+                    text = L.Tr(L.K.BtnAiJiraInstallConfirm)
+                };
+                JiraStyles.ApplyPrimaryButton(confirm);
+                buttons.Add(confirm);
+
+                var cancel = new Button(() =>
+                {
+                    _installState = InstallState.Idle;
+                    Render();
+                })
+                {
+                    text = L.Tr(L.K.BtnAiJiraInstallCancel)
+                };
+                JiraStyles.ApplySecondaryButton(cancel);
+                buttons.Add(cancel);
+
+                _installCard.Add(buttons);
+                return;
+            }
+
+            if (_installState == InstallState.Running)
+            {
+                var running = new Label(L.Tr(L.K.AiJiraInstallRunning));
+                JiraStyles.ApplyMuted(running);
+                _installCard.Add(running);
+                return;
+            }
+
+            var log = new Label(_installLog);
+            JiraStyles.ApplyResultBlock(log, false);
+            _installCard.Add(log);
+        }
+
+        private async Task RunInstallAsync()
+        {
+            _installState = InstallState.Running;
+            Render();
+
+            AiJiraInstallResult result = await AiJiraInstaller.RunAsync(_info);
+
+            if (_root == null)
+                return;
+
+            _installState = InstallState.Idle;
+            _installLog = result.Output ?? string.Empty;
+
+            SetStatus(result.Success
+                    ? L.Tr(L.K.MsgAiJiraInstallOk)
+                    : L.Tr(L.K.MsgAiJiraInstallFailed, result.Error ?? "?"),
+                result.Success);
+
+            // The cache was invalidated by the installer; this is what redraws the
+            // checklist from what is actually on disk now.
+            await RefreshAsync(true);
+        }
+
+        // --- Commands ---------------------------------------------------------
+
+        /// <summary>
+        /// What to type in the chat, once the checklist is green.
+        /// </summary>
+        /// <remarks>
+        /// Present even when the install is incomplete, greyed rather than hidden. The
+        /// point of the tab is to explain what this thing gives you; hiding the payoff
+        /// until setup finishes makes the setup look like busywork.
+        /// </remarks>
         private void RenderCommandsCard()
         {
             var title = new Label(L.Tr(L.K.AiJiraCommandsTitle));
             JiraStyles.ApplySectionTitle(title);
             _commandsCard.Add(title);
 
-            var hint = new Label(L.Tr(L.K.AiJiraDispatchHint));
+            var hint = new Label(_info.IsReady
+                ? L.Tr(L.K.AiJiraCommandsHint)
+                : L.Tr(L.K.AiJiraCommandsPending));
             JiraStyles.ApplyMuted(hint);
             hint.style.marginBottom = 12;
             _commandsCard.Add(hint);
 
             foreach (string name in AiJiraLocator.KnownCommands)
-                _commandsCard.Add(BuildCommandRow(_info.Command(name)));
-        }
+                _commandsCard.Add(CommandRow(name));
 
-        private VisualElement BuildCommandRow(AiJiraCommand command)
-        {
-            var card = new VisualElement();
-            JiraStyles.ApplyNestedCard(card);
-
-            var title = new Label(command.Name);
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.marginBottom = 2;
-            card.Add(title);
-
-            var description = new Label(Description(command.Name));
-            JiraStyles.ApplyMuted(description);
-            description.style.marginBottom = 8;
-            card.Add(description);
-
-            string blocked = BlockedReason(command);
-
-            var button = new Button(() => Dispatch(command.Name))
+            var open = new Button(() => _openAgent?.Invoke())
             {
-                text = ButtonText(command.Name)
+                text = L.Tr(L.K.BtnAiJiraOpenChat)
             };
-            JiraStyles.ApplyPrimaryButton(button);
-            button.SetEnabled(string.IsNullOrEmpty(blocked));
-            card.Add(button);
-
-            if (!string.IsNullOrEmpty(blocked))
-            {
-                var reason = new Label(blocked);
-                JiraStyles.ApplyNote(reason);
-                reason.style.marginTop = 6;
-                card.Add(reason);
-            }
-
-            return card;
+            JiraStyles.ApplySecondaryButton(open);
+            open.style.marginTop = 4;
+            open.SetEnabled(_openAgent != null);
+            _commandsCard.Add(open);
         }
 
-        /// <summary>Why a command cannot run right now, or empty when it can.</summary>
-        private string BlockedReason(AiJiraCommand command)
+        private static VisualElement CommandRow(string command)
         {
-            if (!command.Available)
-                return L.Tr(L.K.AiJiraCommandMissing);
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.FlexStart;
+            row.style.marginBottom = 8;
 
-            if (!_info.HasPowerShell)
-                return L.Tr(L.K.AiJiraPowerShellMissing);
+            var name = new Label("/" + command);
+            name.style.width = 96;
+            name.style.minWidth = 96;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.style.fontSize = 11;
+            row.Add(name);
 
-            if (command.RequiresGh && !_info.HasGh)
-                return L.Tr(L.K.AiJiraGhMissing);
+            var description = new Label(Description(command));
+            JiraStyles.ApplyMuted(description);
+            description.style.flexShrink = 1;
+            description.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(description);
 
-            return string.Empty;
-        }
-
-        private void Dispatch(string command)
-        {
-            if (_dispatch == null)
-                return;
-
-            _dispatch(command);
-            SetStatus(L.Tr(L.K.MsgAiJiraDispatched, command), true);
+            return row;
         }
 
         private static string Description(string command)
@@ -342,48 +537,6 @@ namespace OxenteGames.JiraCommunication.UI
                 case AiJiraLocator.CommandSync: return L.Tr(L.K.AiJiraSyncDesc);
                 default: return string.Empty;
             }
-        }
-
-        private static string ButtonText(string command)
-        {
-            switch (command)
-            {
-                case AiJiraLocator.CommandInit: return L.Tr(L.K.BtnAiJiraInit);
-                case AiJiraLocator.CommandCard: return L.Tr(L.K.BtnAiJiraCard);
-                case AiJiraLocator.CommandPr: return L.Tr(L.K.BtnAiJiraPr);
-                case AiJiraLocator.CommandSync: return L.Tr(L.K.BtnAiJiraSync);
-                default: return command;
-            }
-        }
-
-        // --- Small helpers ----------------------------------------------------
-
-        private static VisualElement Detail(string label, string value)
-        {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.marginBottom = 10;
-
-            var caption = new Label(label);
-            JiraStyles.ApplyMuted(caption);
-            caption.style.marginRight = 8;
-            row.Add(caption);
-
-            var text = new Label(value);
-            JiraStyles.ApplyMuted(text);
-            text.style.flexShrink = 1;
-            text.style.whiteSpace = WhiteSpace.Normal;
-            row.Add(text);
-
-            return row;
-        }
-
-        private static Label Warning(string message)
-        {
-            var label = new Label(message);
-            JiraStyles.ApplyNote(label);
-            label.style.marginBottom = 8;
-            return label;
         }
 
         private void SetStatus(string message, bool success)

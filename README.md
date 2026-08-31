@@ -24,7 +24,7 @@ Base de integração profissional entre o Unity Editor e o Jira Cloud.
   repositório do projeto a partir de uma tarefa ou de uma atividade do Jira, com transcrição ao vivo,
   resultado, histórico e cancelamento. A execução roda em background e sobrevive a recompilação e ao
   fechamento do Unity. Nenhum token novo é armazenado. Ver *Agente local* abaixo.
-- **Integração com o [ai-jira](https://github.com/Mikael-Cavalcanti/ai-jira)**: se o pacote estiver instalado na máquina, uma aba `ai-jira` aparece com um botão por comando (`jira-init`, `jira-card`, `jira-pr`, `jira-sync`), conduzidos pelo agente local. Se não estiver, a aba não existe. Ver *Integração com o ai-jira* abaixo.
+- **Integração com o [ai-jira](https://github.com/Mikael-Cavalcanti/ai-jira)**: digite `/jira-card`, `/jira-sync`, `/jira-pr` ou `/jira-init` no chat da aba Agente e o agente conduz o comando. A instalação e o diagnóstico ficam em `Configurações → ai-jira`. Ver *Integração com o ai-jira* abaixo.
 - **Integração Git/GitHub por convenção**: no detalhe de cada atividade, gera o **nome do branch** (`feat/PROJ-123-titulo`) e a **mensagem de commit** Conventional (`feat(PROJ-123): título`), cria/faz checkout do branch localmente e copia os textos — sem enviar nada ao GitHub e sem precisar de token do GitHub.
 - Aba **Configurações**: idioma (Português / Inglês), API Key/modelo de IA, integração Git/GitHub e limpeza dos dados de conexão salvos.
 - Mensagens amigáveis para erros HTTP comuns.
@@ -313,36 +313,82 @@ sob controle do desenvolvedor: o `EditorPrefs` desta máquina (aba Conexão) e o
 `.env` do projeto, se você optar por preenchê-lo para que o agente consulte o Jira.
 Transições e comentários continuam sendo feitos nesta janela por padrão.
 
-## Integração com o ai-jira (aba `ai-jira`)
+## Integração com o ai-jira
 
 O [ai-jira](https://github.com/Mikael-Cavalcanti/ai-jira) é um conjunto de scripts
 PowerShell que cria o card a partir do diff, abre e faz merge do pull request pelo
 GitHub CLI e move os cards conforme o estado dos PRs. Ele é instalado **por
 máquina**, fora do projeto Unity, então não dá para declará-lo como dependência
-deste package — a janela procura por ele e revela a aba só quando encontra.
+deste package.
 
-### Como a detecção funciona
+### Os comandos ficam no chat
 
-Nesta ordem, parando na primeira que tiver `bin/jira-lib.ps1`:
+Na aba **Agente**, digite com barra:
+
+| Comando | O que faz |
+| --- | --- |
+| `/jira-init` | Lê a instância do Jira e gera o `config.json`. Uma vez por máquina. |
+| `/jira-card` | Lê o diff, escreve o card pelo que a mudança faz, cria e faz checkout do branch. |
+| `/jira-pr` | Abre ou mergeia o PR pelo GitHub CLI e sincroniza o card. |
+| `/jira-sync` | Move os cards pelo estado real dos pull requests. |
+
+O prefixo `jira-` é opcional — `/card` também vale. O que você escrever depois do
+comando vai junto como contexto: `/jira-card só o que mexi em Player.cs`.
+
+A barra **não** é a sintaxe da CLI. Uma execução headless não tem prompt
+interativo para recebê-la, então o que ela dispara aqui é uma reescrita local para
+a mesma instrução que a skill espera. Um comando que não existe é recusado com a
+lista dos que existem, em vez de virar a primeira linha de um prompt.
+
+Quando a skill precisa de uma escolha — épico, tipo, time, prioridade — o agente
+pergunta na resposta e você responde no chat; o próximo turno continua a mesma
+sessão. É a mesma pausa que o ai-jira faz no terminal, em outra superfície.
+
+Cada comando abre uma **conversa nova**. Se você estava no meio de outra, a janela
+diz isso e a anterior continua no histórico.
+
+### Instalação e diagnóstico: `Configurações → ai-jira`
+
+A detecção procura, nesta ordem, parando na primeira que tiver `bin/jira-lib.ps1`:
 
 1. a variável `JIRA_CLI_HOME`, que o `install.ps1` do ai-jira exporta (lida no
    processo **e** no escopo de usuário, para não exigir reiniciar o Unity);
 2. `~/.ai-jira`, que é onde o README dele manda clonar.
 
-Em macOS e Linux a aba nunca aparece: os scripts são PowerShell e não há o que
-rodar lá. O botão **Procurar de novo** repete o probe, e **Copiar diagnóstico** dá
-a trilha completa de busca, com hit/miss por caminho.
+A seção mostra uma checklist de cinco linhas, **ordenada por dependência** — nada
+abaixo da instalação importa antes dela existir, e o `config.json` não sai antes
+das credenciais resolverem:
 
-### O que a aba faz
+| Linha | Se faltar |
+| --- | --- |
+| Instalação | use o botão *Instalar* ali mesmo |
+| PowerShell | nenhum comando roda; os scripts são PowerShell |
+| Credenciais | `/jira-init` imprime os `setx` exatos para você rodar |
+| `config.json` | rode `/jira-init` no chat |
+| GitHub CLI | **opcional** — só o `/jira-pr` para |
 
-Um botão por comando, cada um abrindo uma **conversa nova na aba Agente**. A aba
-não executa script nenhum: as skills do ai-jira foram escritas para serem
-conduzidas por um agente, e um segundo caminho de execução seria um segundo
-conjunto de bugs sem capacidade nova.
+O botão de instalar é de dois cliques: o primeiro mostra a linha de comando exata
+(`git clone`, ou `git -C … pull --ff-only`, e o `install.ps1`), o segundo executa e
+mostra a saída dos dois passos separados, para uma falha dizer qual metade quebrou.
 
-Quando a skill precisa de uma escolha — épico, tipo, time, prioridade — o agente
-pergunta na resposta e você responde no chat; o próximo turno continua a mesma
-sessão. É a mesma pausa que o ai-jira faz no terminal, em outra superfície.
+Em macOS e Linux não há o que instalar: os scripts são PowerShell.
+
+### Credenciais
+
+O ai-jira lê o host do Jira em `JIRA_BASE_URL`; este package sempre gravou
+`JIRA_URL`. Mesmo valor, nome diferente — é a causa mais comum de o `jira-init`
+parar dizendo que faltam credenciais numa máquina que já está conectada na aba
+Conexão.
+
+As execuções disparadas pela janela recebem o **alias** automaticamente, mais o
+`JIRA_CLI_HOME` a partir do caminho detectado, sem sobrescrever nada definido à
+mão. Para rodar os scripts direto num terminal, aí as variáveis precisam existir no
+escopo de usuário — e é o `setx` que o `/jira-init` imprime.
+
+**A checklist nunca lê o token.** Das três variáveis só se testa presença, e só
+presença entra na trilha do *Copiar diagnóstico* — esse texto existe para ser
+colado em outro lugar, e a única garantia sólida de que um `JIRA_API_TOKEN` não vai
+junto é o valor nunca ser lido.
 
 ### Precedência sobre o helper deste package
 
@@ -356,24 +402,8 @@ Sem essa regra o agente fica com dois manuais de Jira no contexto e escolhe um p
 turno, o que faz o mesmo desenvolvedor ter o card criado de dois jeitos diferentes
 em duas mensagens seguidas.
 
-### Credenciais
-
-O ai-jira lê o host do Jira em `JIRA_BASE_URL`; este package sempre gravou
-`JIRA_URL`. Mesmo valor, nome diferente. A execução passa a receber o **alias**,
-mais `JIRA_CLI_HOME` a partir do caminho detectado, sem sobrescrever nada que você
-tenha definido à mão. Na prática: quem já conectou na aba Conexão não precisa
-digitar a URL de novo em nenhum comando do ai-jira.
-
-### O que pode faltar
-
-A aba avisa antes de você esbarrar, e como avisos — não como erros que escondem os
-comandos que ainda funcionam:
-
-| Falta | Consequência |
-| --- | --- |
-| `pwsh` e `powershell` fora do PATH | nenhum comando roda |
-| `gh` fora do PATH | só o `jira-pr` para |
-| skills não registradas para a CLI configurada | o agente não conhece os comandos pelo nome; rode o `install.ps1` do ai-jira de novo |
+> As instruções do projeto são geradas em `Configurações → Agente local`. Sem
+> gerá-las, essa regra de precedência não chega ao agente.
 
 ## Segurança
 
