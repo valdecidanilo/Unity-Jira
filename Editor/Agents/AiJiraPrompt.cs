@@ -211,6 +211,11 @@ namespace OxenteGames.JiraCommunication.Agents
             sb.AppendLine("Fall back to `jira.sh` or raw `curl` only for what no skill covers — reading an");
             sb.AppendLine("issue the prompt referenced, searching by title, leaving a comment.");
             sb.AppendLine();
+            sb.AppendLine("That install is inside your workspace: the run is launched with `--add-dir` for");
+            sb.AppendLine("it, so reading the skills, the scripts and `config.json` there is allowed. If a");
+            sb.AppendLine("path under it is still refused, say which one — do not work around it by");
+            sb.AppendLine("guessing the project, field or status names that file holds.");
+            sb.AppendLine();
 
             if (!info.HasGh)
             {

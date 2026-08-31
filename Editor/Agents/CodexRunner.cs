@@ -7,11 +7,21 @@ namespace OxenteGames.JiraCommunication.Agents
     /// Drives the OpenAI Codex CLI in non-interactive mode with JSON events.
     /// </summary>
     /// <remarks>
+    /// <c>AgentRequest.AdditionalDirectories</c> is deliberately not emitted here.
+    /// Codex has no <c>--add-dir</c>: its sandbox already lets a run read outside the
+    /// working directory, and widening what it may <em>write</em> means overriding
+    /// <c>sandbox_workspace_write.writable_roots</c> — a JSON array passed through
+    /// <c>-c</c>, which would have to survive both cmd.exe quoting and a config key
+    /// that belongs to another project's release cycle. So the grant is honored on the
+    /// Claude side, where the flag exists, and an ai-jira run under Codex writes only
+    /// inside the repository.
+    /// <para>
     /// This runner exists to prove the seam holds for a second dialect, and its parser
     /// is deliberately more forgiving than the Claude one: it classifies the event
     /// shapes Codex is documented to emit and falls back to surfacing any text it can
     /// find rather than dropping the line. A CLI whose event names drift should
     /// degrade to a readable transcript, never to an empty one.
+    /// </para>
     /// </remarks>
     internal sealed class CodexRunner : IAgentRunner
     {

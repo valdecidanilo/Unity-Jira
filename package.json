@@ -1,6 +1,6 @@
 {
   "name": "com.oxentegames.unity-jira",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "displayName": "Jira Communication",
   "description": "Professional Unity Editor integration for Jira Cloud, with a local coding agent (Claude Code / Codex CLI) driven from the Editor.",
   "unity": "2021.3",

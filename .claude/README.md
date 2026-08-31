@@ -45,7 +45,24 @@ para o Claude Code não pedir aprovação a cada chamada. Na primeira vez que vo
 o repo, o Claude Code pergunta se confia nas configurações do projeto — aceite.
 
 Preferências pessoais que não devem ir pro repo: use `.claude/settings.local.json`
-(já está no `.gitignore`).
+(já está no `.gitignore`). É lá que entra o que é caminho de máquina — por exemplo
+liberar a instalação do ai-jira, que mora fora do repositório:
+
+```json
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:\\Users\\voce\\.ai-jira",
+      "C:\\Users\\voce\\.claude\\skills"
+    ]
+  }
+}
+```
+
+Sem isso o agente lê esses caminhos e recebe de volta que estão **fora dos
+diretórios permitidos**. As execuções disparadas pela janela do Jira dentro do
+Unity já recebem esse acesso sozinhas (`--add-dir`); este arquivo é para quando
+você mesmo abre o `claude` no terminal.
 
 ### Precedência de config
 

@@ -190,6 +190,26 @@ namespace OxenteGames.JiraCommunication.Agents
         public string AllowedTools = string.Empty;
 
         /// <summary>
+        /// Directories outside <see cref="WorkingDirectory"/> that this run is allowed
+        /// to read, write and <c>cd</c> into.
+        /// </summary>
+        /// <remarks>
+        /// A separate grant from <see cref="AllowedTools"/>, because the CLI enforces
+        /// the two independently: a tool can be pre-approved and still refuse the call
+        /// because the path lies outside the workspace. That is the refusal a run hits
+        /// when it reaches for the ai-jira install — the skills, the scripts and
+        /// <c>config.json</c> all live in the developer's home, not in the repository —
+        /// and headless there is nobody to approve it, so the run stops mid-task after
+        /// having already announced what it was about to do.
+        /// <para>
+        /// Filled by <c>AgentService</c> from what the machine actually has, so the
+        /// grant names real directories instead of a fixed guess. A caller that sets
+        /// this itself is left alone.
+        /// </para>
+        /// </remarks>
+        public readonly List<string> AdditionalDirectories = new List<string>();
+
+        /// <summary>
         /// Strip the variables that would move this run off the developer's plan and
         /// onto a billed API account. See <c>JiraPreferences.AgentPlanOnly</c>.
         /// </summary>

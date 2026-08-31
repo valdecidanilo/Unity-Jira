@@ -1371,6 +1371,16 @@ namespace OxenteGames.JiraCommunication.UI
             if (string.IsNullOrWhiteSpace(_workingDirectory))
                 await ResolveWorkingDirectoryAsync();
 
+            // Read-only cannot run these. Every ai-jira command exists to change
+            // something — create the card, move it, open the pull request — so the
+            // posture is raised for this command and, deliberately, said out loud: a
+            // developer who chose read-only chose it, and finding out from a
+            // transcript that it was overridden is worse than being told here.
+            string posture = JiraPreferences.AgentPermission;
+            bool raised = posture == AgentPermission.Plan;
+            if (raised)
+                posture = AgentPermission.AcceptEdits;
+
             var request = new AgentRequest
             {
                 Provider = Provider,
@@ -1381,7 +1391,7 @@ namespace OxenteGames.JiraCommunication.UI
                 Prompt = AiJiraPrompt.Build(command, extra, IsPortuguese),
                 ThreadId = string.Empty,
                 Title = AiJiraPrompt.Title(command),
-                PermissionMode = JiraPreferences.AgentPermission,
+                PermissionMode = posture,
                 Model = AgentModelCatalog.Sanitize(Provider, JiraPreferences.GetAgentModel(Provider))
             };
 
@@ -1391,7 +1401,11 @@ namespace OxenteGames.JiraCommunication.UI
             // Said out loud rather than done quietly: the transcript on screen was
             // replaced, and someone who typed a command mid-conversation deserves to
             // know their previous thread is in the history rather than lost.
-            SetStatus(continuing ? L.Tr(L.K.MsgAiJiraNewThread, command) : string.Empty, true);
+            SetStatus(
+                raised ? L.Tr(L.K.MsgAiJiraPermissionRaised, command)
+                       : continuing ? L.Tr(L.K.MsgAiJiraNewThread, command)
+                       : string.Empty,
+                true);
             await LaunchAsync(request);
         }
 
@@ -1455,6 +1469,11 @@ namespace OxenteGames.JiraCommunication.UI
                 // point: the terminal picks up where the window left off.
                 ResumeSessionId = resumable?.SessionId ?? string.Empty
             };
+
+            // The same grant a tracked run gets, from the cached probe: the terminal is
+            // opened to continue this conversation, and a session that cannot see the
+            // ai-jira install would answer differently from the one it continues.
+            AgentService.ApplyAdditionalDirectories(request);
 
             IAgentRunner runner = AgentService.CreateRunner(Provider);
             string command = runner.BuildInteractiveCommandLine(request);

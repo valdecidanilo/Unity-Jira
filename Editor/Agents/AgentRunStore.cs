@@ -172,6 +172,11 @@ namespace OxenteGames.JiraCommunication.Agents
             sb.Append(',');
             Append(sb, "workingDirectory", request.WorkingDirectory);
             sb.Append(',');
+            // Recorded because it is a grant: what this run was allowed to reach
+            // outside the repository has to be answerable afterwards, from the run
+            // directory alone.
+            AppendArray(sb, "additionalDirectories", request.AdditionalDirectories);
+            sb.Append(',');
             Append(sb, "executablePath", request.ExecutablePath);
             sb.Append(',');
             Append(sb, "model", request.Model);
@@ -184,6 +189,23 @@ namespace OxenteGames.JiraCommunication.Agents
             sb.Append('}');
 
             File.WriteAllText(paths.Request, sb.ToString(), new UTF8Encoding(false));
+        }
+
+        private static void AppendArray(StringBuilder sb, string key, IList<string> values)
+        {
+            sb.Append('"').Append(key).Append("\":[");
+
+            for (int i = 0; values != null && i < values.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append(',');
+
+                sb.Append('"')
+                  .Append(JiraIssueDraft.JsonEscape(values[i] ?? string.Empty))
+                  .Append('"');
+            }
+
+            sb.Append(']');
         }
 
         private static void Append(StringBuilder sb, string key, string value)

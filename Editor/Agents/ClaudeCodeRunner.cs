@@ -36,6 +36,8 @@ namespace OxenteGames.JiraCommunication.Agents
             if (!string.IsNullOrWhiteSpace(request.ResumeSessionId))
                 sb.Append(" --resume ").Append(AgentScript.Quote(request.ResumeSessionId));
 
+            AppendAdditionalDirectories(sb, request);
+
             // Last on the line, deliberately: the flag is variadic and would swallow
             // any bare word that followed it.
             if (!string.IsNullOrWhiteSpace(request.AllowedTools))
@@ -55,7 +57,34 @@ namespace OxenteGames.JiraCommunication.Agents
             if (!string.IsNullOrWhiteSpace(request.ResumeSessionId))
                 sb.Append(" --resume ").Append(AgentScript.Quote(request.ResumeSessionId));
 
+            // Also granted for an interactive session. The developer could type
+            // "/add-dir" themselves, but a terminal opened from this window is meant to
+            // continue the same conversation, and one that cannot see the ai-jira
+            // install behaves differently from the run it is continuing.
+            AppendAdditionalDirectories(sb, request);
+
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Extends the CLI's workspace with the directories the run was granted.
+        /// </summary>
+        /// <remarks>
+        /// One flag per directory. <c>--add-dir</c> is variadic like
+        /// <c>--allowedTools</c>, so a single flag followed by several paths would also
+        /// swallow whatever came next on the line — including the prompt redirection
+        /// the launcher script appends.
+        /// </remarks>
+        private static void AppendAdditionalDirectories(StringBuilder sb, AgentRequest request)
+        {
+            if (request.AdditionalDirectories == null)
+                return;
+
+            foreach (string directory in request.AdditionalDirectories)
+            {
+                if (!string.IsNullOrWhiteSpace(directory))
+                    sb.Append(" --add-dir ").Append(AgentScript.Quote(directory));
+            }
         }
 
         private static string Executable(AgentRequest request)

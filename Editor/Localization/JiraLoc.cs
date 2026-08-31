@@ -1151,6 +1151,12 @@ namespace OxenteGames.JiraCommunication.Localization
                 "opcional — só o /jira-pr precisa dele. Instale com: winget install --id GitHub.cli",
                 "optional — only /jira-pr needs it. Install with: winget install --id GitHub.cli"
             },
+            [K.AiJiraCheckAccess] = new[] { "Acesso do agente", "Agent access" },
+            [K.AiJiraCheckAccessNone] = new[]
+            {
+                "nada além do repositório — é o esperado enquanto o ai-jira não está instalado",
+                "nothing beyond the repository — expected while ai-jira is not installed"
+            },
 
             [K.AiJiraInstallTitle] = new[] { "Instalar o ai-jira", "Install ai-jira" },
             [K.AiJiraUpdateTitle] = new[] { "Atualizar o ai-jira", "Update ai-jira" },
@@ -1212,6 +1218,11 @@ namespace OxenteGames.JiraCommunication.Localization
             {
                 "{0} abriu uma conversa nova — a anterior está no histórico.",
                 "{0} opened a new conversation — the previous one is in the history."
+            },
+            [K.MsgAiJiraPermissionRaised] = new[]
+            {
+                "{0} precisa escrever, então esta execução rodou como \"Editar sem perguntar\" — só ela.",
+                "{0} has to write, so this run used \"Edit without asking\" — this run only."
             },
         };
 
@@ -1690,6 +1701,8 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string AiJiraCheckConfigMissing = "AiJiraCheckConfigMissing";
             public const string AiJiraCheckGh = "AiJiraCheckGh";
             public const string AiJiraCheckGhMissing = "AiJiraCheckGhMissing";
+            public const string AiJiraCheckAccess = "AiJiraCheckAccess";
+            public const string AiJiraCheckAccessNone = "AiJiraCheckAccessNone";
             public const string AiJiraInstallTitle = "AiJiraInstallTitle";
             public const string AiJiraUpdateTitle = "AiJiraUpdateTitle";
             public const string AiJiraInstallExplain = "AiJiraInstallExplain";
@@ -1710,6 +1723,7 @@ namespace OxenteGames.JiraCommunication.Localization
             public const string MsgAiJiraNeedsConfig = "MsgAiJiraNeedsConfig";
             public const string MsgAiJiraUnknownCommand = "MsgAiJiraUnknownCommand";
             public const string MsgAiJiraNewThread = "MsgAiJiraNewThread";
+            public const string MsgAiJiraPermissionRaised = "MsgAiJiraPermissionRaised";
         }
     }
 }

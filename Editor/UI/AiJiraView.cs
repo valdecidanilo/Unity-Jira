@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using OxenteGames.JiraCommunication.Agents;
 using OxenteGames.JiraCommunication.Settings;
@@ -54,6 +55,12 @@ namespace OxenteGames.JiraCommunication.UI
 
         private AiJiraInfo _info;
         private bool _probing;
+
+        /// <summary>
+        /// The repository a run would work in. Held only so the access row can say
+        /// which directories are granted <em>on top of</em> it.
+        /// </summary>
+        private string _workingDirectory = string.Empty;
 
         private InstallState _installState = InstallState.Idle;
         private string _installLog = string.Empty;
@@ -112,6 +119,7 @@ namespace OxenteGames.JiraCommunication.UI
             try
             {
                 _info = await AiJiraLocator.LocateAsync(force);
+                _workingDirectory = await AgentService.ResolveWorkingDirectoryAsync();
             }
             finally
             {
@@ -249,6 +257,21 @@ namespace OxenteGames.JiraCommunication.UI
                 _info.HasGh,
                 L.Tr(L.K.AiJiraCheckGh),
                 _info.HasGh ? _info.GhPath : L.Tr(L.K.AiJiraCheckGhMissing),
+                true));
+
+            // What the run may reach outside the repository. Shown because it is the
+            // failure nobody can diagnose from a transcript: the agent says the path is
+            // outside the allowed directories and stops, and nothing in the window
+            // explains which directories those were.
+            List<string> granted = AgentService.ResolveAdditionalDirectories(
+                _info, Provider, _workingDirectory);
+
+            _statusCard.Add(Row(
+                granted.Count > 0,
+                L.Tr(L.K.AiJiraCheckAccess),
+                granted.Count > 0
+                    ? string.Join("\n", granted.ToArray())
+                    : L.Tr(L.K.AiJiraCheckAccessNone),
                 true));
 
             if (_info.Found && !AiJiraLocator.SkillsWiredFor(Provider))

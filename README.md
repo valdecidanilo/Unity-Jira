@@ -160,9 +160,14 @@ descrição e o nome do branch da convenção já preenchidos.
 
 | Modo | Efeito |
 | --- | --- |
-| Somente leitura | Investiga e propõe; nada em disco muda. É o padrão. |
+| Somente leitura | Investiga e propõe; nada em disco muda. |
 | Padrão da CLI | A CLI pergunta antes de editar — e em background ninguém responde, então ela para. |
-| Editar sem perguntar | Para execuções que devem alterar o projeto. |
+| Editar sem perguntar | Para execuções que devem alterar o projeto. É o padrão. |
+
+Os comandos do ai-jira (`/jira-card`, `/jira-sync`, `/jira-pr`, `/jira-init`)
+existem para **mudar** alguma coisa, então em *Somente leitura* eles não teriam como
+funcionar. Nesse caso a execução — só ela — sobe para *Editar sem perguntar*, e a
+janela diz isso na linha de status em vez de fazer calado.
 
 `bypassPermissions` não é exposto: um agente headless com todas as travas
 desligadas não deve ser alcançável por um clique.
@@ -266,6 +271,13 @@ não estiver liberado de antemão é negado no meio da tarefa. Por isso, quando 
 `.env` tem as três chaves preenchidas, o run recebe `--allowedTools "Bash(curl *)"`:
 uma permissão só, e apenas nesse caso. Dá para desligar em Configurações.
 
+A lista pré-aprovada inclui também as ferramentas de leitura (`Read`, `Glob`,
+`Grep`), o `git` de leitura — `log`, `diff`, `show`, `shortlog`, `blame`,
+`ls-files` — e os comandos de branch. É o que "veja o que já foi feito e atualize o
+Jira" usa do começo ao fim: sem eles a execução era negada logo no primeiro passo.
+Liberar a ferramenta, porém, não libera o **caminho** — ver *O que a execução pode
+alcançar*, na seção do ai-jira.
+
 As **instruções do projeto** são regeradas sozinhas quando estão desatualizadas.
 Versões antigas diziam ao agente que ele não tinha credencial do Jira e não devia
 tentar a API; com o `.env` preenchido isso está errado, e um arquivo velho fazia o
@@ -367,11 +379,48 @@ das credenciais resolverem:
 | `config.json` | rode `/jira-init` no chat |
 | GitHub CLI | **opcional** — só o `/jira-pr` para |
 
+Abaixo delas, a linha **Acesso do agente** lista os diretórios que a execução
+recebe além do repositório. Ver *O que a execução pode alcançar* logo adiante.
+
 O botão de instalar é de dois cliques: o primeiro mostra a linha de comando exata
 (`git clone`, ou `git -C … pull --ff-only`, e o `install.ps1`), o segundo executa e
 mostra a saída dos dois passos separados, para uma falha dizer qual metade quebrou.
 
 Em macOS e Linux não há o que instalar: os scripts são PowerShell.
+
+### O que a execução pode alcançar
+
+A CLI confina a execução ao **diretório de trabalho** — o repositório. Tudo que o
+fluxo do Jira precisa está instalado fora dele: os scripts do ai-jira, as skills,
+e o `config.json` que carrega os projetos, campos e status reais da instância. Sem
+liberar isso, o agente responde que o caminho está **fora dos diretórios
+permitidos** e para no meio da tarefa — depois de já ter dito o que ia fazer. É a
+falha que mais parece agente desobedecendo, e não é.
+
+Por isso cada execução recebe `--add-dir` para:
+
+| Diretório | Por que |
+| --- | --- |
+| a instalação do ai-jira (`JIRA_CLI_HOME`) | cobre `bin/`, `skills/` e o `config.json` de uma vez |
+| a pasta do `config.json`, se estiver em outro lugar | todo comando menos o `/jira-init` lê dela |
+| `~/.claude/skills` (ou `~/.codex/skills`) | é a skill que o prompt manda seguir; o agente precisa poder ler o arquivo |
+| a raiz do projeto Unity, quando fica fora do repositório configurado | acontece com o package consumido de fora do repo do jogo |
+
+Só diretórios que **existem** entram: um caminho inexistente faz a CLI recusar a
+flag, e aí a execução falha por um motivo que não tem nada a ver com a tarefa. O
+que já está dentro do diretório de trabalho não é repetido. Nada mais largo é
+liberado — a pasta pessoal inteira, nunca; do home da CLI só a subpasta `skills`,
+porque ali também moram as suas configurações e todas as transcrições que ela já
+escreveu.
+
+O grant fica registrado no `request.json` da execução, em
+`Library/JiraAgent/<runId>` — o que aquele run podia alcançar é respondível depois,
+só com o diretório dele.
+
+> Liberar diretório e liberar ferramenta são **duas coisas diferentes**, e as duas
+> precisam estar no lugar: uma ferramenta pré-aprovada ainda recusa um caminho fora
+> do espaço de trabalho. Em Codex o `--add-dir` não existe: o sandbox dele já lê
+> fora do diretório de trabalho, e a escrita continua restrita ao repositório.
 
 ### Credenciais
 
